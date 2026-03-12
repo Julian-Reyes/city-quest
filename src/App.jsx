@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -138,7 +138,24 @@ function RecenterMap({ center, selectedVenue }) {
   return null;
 }
 
-function MapView({ venues, userLocation, onVenueClick, selectedVenue }) {
+function MapMoveDetector({ fetchCenter, onSearchArea }) {
+  const map = useMapEvents({
+    moveend: () => {
+      if (!fetchCenter) return;
+      const center = map.getCenter();
+      const zoom = map.getZoom();
+      const dist = distanceMiles(fetchCenter.lat, fetchCenter.lng, center.lat, center.lng);
+      if (zoom >= 12 && dist > 1.5) {
+        onSearchArea({ lat: center.lat, lng: center.lng, zoom });
+      } else {
+        onSearchArea(null);
+      }
+    },
+  });
+  return null;
+}
+
+function MapView({ venues, userLocation, onVenueClick, selectedVenue, fetchCenter, onSearchArea, searchArea }) {
   const center = userLocation || { lat: 37.7749, lng: -122.4194 };
 
   return (
@@ -154,6 +171,7 @@ function MapView({ venues, userLocation, onVenueClick, selectedVenue }) {
         maxZoom={19}
       />
       <RecenterMap center={userLocation} selectedVenue={selectedVenue} />
+      <MapMoveDetector fetchCenter={fetchCenter} onSearchArea={onSearchArea} />
       {venues.map((venue) => (
         <Marker
           key={venue.id}
@@ -310,22 +328,24 @@ function distanceMiles(lat1, lng1, lat2, lng2) {
 }
 
 // ─── SIDEBAR CONTENT ────────────────────────────────────────────────────────
-function ListPanel({ typeVenues, typeVisited, onVenueClick, userLocation }) {
+function ListPanel({ typeVenues, typeVisited, onVenueClick, userLocation, showHeader = true }) {
   return (
     <div
-      style={{ height: "100%", overflowY: "auto", padding: "12px 12px 80px" }}
+      style={{ height: "100%", overflowY: "auto", padding: showHeader ? "12px 12px 80px" : "4px 12px 80px" }}
     >
-      <div
-        style={{
-          marginBottom: 12,
-          color: "rgba(255,255,255,0.4)",
-          fontSize: 11,
-          letterSpacing: 2,
-          textTransform: "uppercase",
-        }}
-      >
-        {typeVisited} of {typeVenues.length} visited
-      </div>
+      {showHeader && (
+        <div
+          style={{
+            marginBottom: 12,
+            color: "rgba(255,255,255,0.4)",
+            fontSize: 11,
+            letterSpacing: 2,
+            textTransform: "uppercase",
+          }}
+        >
+          {typeVisited} of {typeVenues.length} visited
+        </div>
+      )}
       {typeVenues.map((v) => (
         <div
           key={v.id}
@@ -496,6 +516,114 @@ function AchievementsPanel({ visitedCount }) {
   );
 }
 
+// ─── BOTTOM SHEET (mobile only) ──────────────────────────────────────────────
+function BottomSheet({ sheetState, onStateChange, children, dragLabel }) {
+  const sheetRef = useRef(null);
+  const dragRef = useRef({ startY: 0, startTranslate: 0, isDragging: false });
+
+  const getTranslateY = (state) => {
+    switch (state) {
+      case "expanded": return 15;
+      case "peek": return 70;
+      case "collapsed": return 92;
+      default: return 70;
+    }
+  };
+
+  const handleTouchStart = useCallback((e) => {
+    dragRef.current = {
+      startY: e.touches[0].clientY,
+      startTranslate: getTranslateY(sheetState),
+      isDragging: true,
+    };
+    if (sheetRef.current) sheetRef.current.style.transition = "none";
+  }, [sheetState]);
+
+  const handleTouchMove = useCallback((e) => {
+    if (!dragRef.current.isDragging || !sheetRef.current) return;
+    const deltaY = e.touches[0].clientY - dragRef.current.startY;
+    const containerHeight = sheetRef.current.parentElement.offsetHeight;
+    const deltaPercent = (deltaY / containerHeight) * 100;
+    const newTranslate = Math.max(15, Math.min(92, dragRef.current.startTranslate + deltaPercent));
+    sheetRef.current.style.transform = `translateY(${newTranslate}%)`;
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!dragRef.current.isDragging || !sheetRef.current) return;
+    dragRef.current.isDragging = false;
+    sheetRef.current.style.transition = "transform 0.3s ease";
+    const match = sheetRef.current.style.transform.match(/translateY\(([\d.]+)%\)/);
+    const currentY = match ? parseFloat(match[1]) : getTranslateY(sheetState);
+    let target;
+    if (currentY < 42) target = "expanded";
+    else if (currentY < 82) target = "peek";
+    else target = "collapsed";
+    onStateChange(target);
+    sheetRef.current.style.transform = `translateY(${getTranslateY(target)}%)`;
+  }, [sheetState, onStateChange]);
+
+  return (
+    <div
+      ref={sheetRef}
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: "100%",
+        transform: `translateY(${getTranslateY(sheetState)}%)`,
+        transition: "transform 0.3s ease",
+        zIndex: 500,
+        display: "flex",
+        flexDirection: "column",
+        background: "#0f0f1a",
+        borderRadius: "16px 16px 0 0",
+        boxShadow: "0 -4px 20px rgba(0,0,0,0.5)",
+      }}
+    >
+      {/* Drag handle zone (includes pill + label row) */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          padding: "10px 12px 8px",
+          cursor: "grab",
+          touchAction: "none",
+          flexShrink: 0,
+        }}
+      >
+        <div style={{
+          width: 36,
+          height: 4,
+          background: "rgba(255,255,255,0.2)",
+          borderRadius: 2,
+          margin: "0 auto 10px",
+        }} />
+        {dragLabel && (
+          <div style={{
+            color: "rgba(255,255,255,0.4)",
+            fontSize: 11,
+            letterSpacing: 2,
+            textTransform: "uppercase",
+          }}>
+            {dragLabel}
+          </div>
+        )}
+      </div>
+
+      {/* Scrollable content */}
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        overscrollBehavior: "contain",
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const isDesktop = useIsDesktop();
@@ -503,13 +631,15 @@ export default function App() {
   const [venues, setVenues] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
   const [selectedVenue, setSelectedVenue] = useState(null);
-  const [panel, setPanel] = useState("list"); // mobile: map | list | achievements — desktop: list | achievements
+  const [panel, setPanel] = useState("list"); // list | achievements
+  const [sheetState, setSheetState] = useState("peek"); // mobile: peek | expanded | collapsed
   const [loading, setLoading] = useState(true);
   const [checkinModal, setCheckinModal] = useState(false);
   const [note, setNote] = useState("");
   const [photo, setPhoto] = useState(null);
   const [toast, setToast] = useState(null);
   const [newAchievement, setNewAchievement] = useState(null);
+  const [searchArea, setSearchArea] = useState(null); // {lat, lng} when user pans far enough
   const fileInputRef = useRef(null);
   const venueCacheRef = useRef({});
 
@@ -585,6 +715,20 @@ export default function App() {
       .catch(() => {});
   }, [fetchCenter]);
 
+  // ── Merge helper: combine new venues with existing, preserving visited state ──
+  const mergeVenues = useCallback((existing, fetched) => {
+    const map = new Map(existing.map((v) => [v.id, v]));
+    for (const v of fetched) {
+      if (map.has(v.id)) {
+        const old = map.get(v.id);
+        map.set(v.id, { ...v, visited: old.visited, visitedAt: old.visitedAt, photo: old.photo, note: old.note });
+      } else {
+        map.set(v.id, v);
+      }
+    }
+    return Array.from(map.values());
+  }, []);
+
   // ── Fetch venues for active type ──
   useEffect(() => {
     if (!fetchCenter) return;
@@ -612,6 +756,30 @@ export default function App() {
 
     return () => controller.abort();
   }, [activeType, fetchCenter]);
+
+  // ── Search this area handler ──
+  const handleSearchArea = useCallback(() => {
+    if (!searchArea) return;
+    const controller = new AbortController();
+    setLoading(true);
+    setSearchArea(null);
+    const newCenter = { lat: searchArea.lat, lng: searchArea.lng };
+    setFetchCenter(newCenter);
+    fetchVenues(newCenter.lat, newCenter.lng, activeType, controller.signal)
+      .then((fetched) => {
+        setVenues((prev) => {
+          const merged = mergeVenues(prev, fetched);
+          venueCacheRef.current[activeType] = merged;
+          return merged;
+        });
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (err.name === "AbortError") return;
+        console.error("Failed to fetch venues:", err);
+        setLoading(false);
+      });
+  }, [searchArea, activeType, mergeVenues]);
 
   const handleCheckin = useCallback(() => {
     if (!selectedVenue) return;
@@ -751,6 +919,8 @@ export default function App() {
             onClick={() => {
               setActiveType(t.id);
               setSelectedVenue(null);
+              setSearchArea(null);
+              if (!isDesktop) setSheetState("peek");
               if (venueCacheRef.current[t.id]) {
                 setVenues(venueCacheRef.current[t.id]);
                 setLoading(false);
@@ -807,7 +977,7 @@ export default function App() {
         />
       </div>
 
-      {/* ── NAV (mobile: map/list/achievements — desktop: list/achievements) ── */}
+      {/* ── NAV (list/achievements) ── */}
       <div
         style={{
           display: "flex",
@@ -816,17 +986,10 @@ export default function App() {
           flexShrink: 0,
         }}
       >
-        {(isDesktop
-          ? [
-              ["list", "📋", "List"],
-              ["achievements", "🏆", "Awards"],
-            ]
-          : [
-              ["map", "🗺️", "Map"],
-              ["list", "📋", "List"],
-              ["achievements", "🏆", "Awards"],
-            ]
-        ).map(([id, icon, label]) => (
+        {[
+          ["list", "📋", "List"],
+          ["achievements", "🏆", "Awards"],
+        ].map(([id, icon, label]) => (
           <button
             key={id}
             onClick={() => setPanel(id)}
@@ -834,14 +997,9 @@ export default function App() {
               flex: 1,
               padding: "8px",
               background:
-                panel === id || (isDesktop && id === "list" && panel === "map")
-                  ? "rgba(255,255,255,0.05)"
-                  : "transparent",
+                panel === id ? "rgba(255,255,255,0.05)" : "transparent",
               border: "none",
-              color:
-                panel === id || (isDesktop && id === "list" && panel === "map")
-                  ? "#fff"
-                  : "rgba(255,255,255,0.35)",
+              color: panel === id ? "#fff" : "rgba(255,255,255,0.35)",
               cursor: "pointer",
               fontSize: 10,
               letterSpacing: 1.5,
@@ -852,7 +1010,7 @@ export default function App() {
               alignItems: "center",
               gap: 2,
               borderBottom:
-                panel === id || (isDesktop && id === "list" && panel === "map")
+                panel === id
                   ? "2px solid #f59e0b"
                   : "2px solid transparent",
             }}
@@ -872,93 +1030,147 @@ export default function App() {
           display: isDesktop ? "flex" : "block",
         }}
       >
-        {/* ── MAP (always visible on desktop, tab-switched on mobile) ── */}
-        {(isDesktop || panel === "map") && (
-          <div
-            style={{
-              position: "relative",
-              flex: isDesktop ? "1 1 60%" : undefined,
-              height: isDesktop ? "100%" : "100%",
-              minWidth: 0,
-            }}
-          >
-            {loading ? (
+        {/* ── MAP (always visible) ── */}
+        <div
+          style={{
+            position: "relative",
+            flex: isDesktop ? "1 1 60%" : undefined,
+            height: "100%",
+            minWidth: 0,
+          }}
+        >
+          {loading ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              <div
+                style={{ fontSize: 40, animation: "spin 1s linear infinite" }}
+              >
+                {VENUE_TYPES.find((t) => t.id === activeType)?.emoji || "🍺"}
+              </div>
               <div
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  flexDirection: "column",
-                  gap: 12,
+                  color: "rgba(255,255,255,0.4)",
+                  letterSpacing: 2,
+                  fontSize: 11,
+                  textTransform: "uppercase",
                 }}
               >
-                <div
-                  style={{ fontSize: 40, animation: "spin 1s linear infinite" }}
-                >
-                  {VENUE_TYPES.find((t) => t.id === activeType)?.emoji || "🍺"}
-                </div>
-                <div
-                  style={{
-                    color: "rgba(255,255,255,0.4)",
-                    letterSpacing: 2,
-                    fontSize: 11,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Finding venues...
-                </div>
+                Finding venues...
               </div>
-            ) : (
-              <MapView
-                venues={typeVenues}
+            </div>
+          ) : (
+            <MapView
+              venues={typeVenues}
+              userLocation={userLocation}
+              selectedVenue={selectedVenue}
+              fetchCenter={fetchCenter}
+              searchArea={searchArea}
+              onSearchArea={setSearchArea}
+              onVenueClick={(v) => {
+                setSelectedVenue(v);
+                if (!isDesktop) setSheetState("collapsed");
+              }}
+            />
+          )}
+
+          {/* SEARCH THIS AREA BUTTON */}
+          {searchArea && !loading && (
+            <button
+              onClick={handleSearchArea}
+              style={{
+                position: "absolute",
+                top: 12,
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 600,
+                padding: "8px 16px",
+                background: "rgba(15,15,26,0.9)",
+                border: "1px solid rgba(245,158,11,0.4)",
+                borderRadius: 20,
+                color: "#f59e0b",
+                fontSize: 12,
+                fontWeight: 600,
+                letterSpacing: 1,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                backdropFilter: "blur(8px)",
+                whiteSpace: "nowrap",
+                animation: "fadeIn 0.2s ease",
+              }}
+            >
+              Search this area
+            </button>
+          )}
+
+          {/* VENUE CARD — mobile only (overlay on map, above collapsed sheet) */}
+          {!isDesktop && selectedVenue && (
+            <VenueCard
+              venue={selectedVenue}
+              onClose={() => {
+                setSelectedVenue(null);
+                setSheetState("peek");
+              }}
+              onCheckin={() => setCheckinModal(true)}
+              style={{
+                position: "absolute",
+                bottom: 60,
+                left: 0,
+                right: 0,
+                zIndex: 900,
+                background: "linear-gradient(0deg, #0f0f1a 80%, transparent)",
+                padding: "32px 16px 16px",
+                animation: "slideUp 0.25s ease",
+              }}
+            />
+          )}
+        </div>
+
+        {/* ── BOTTOM SHEET (mobile only) ── */}
+        {!isDesktop && (
+          <BottomSheet
+            sheetState={sheetState}
+            onStateChange={setSheetState}
+            dragLabel={panel === "list" ? `${typeVisited} of ${typeVenues.length} visited` : null}
+          >
+            {panel === "list" && (
+              <ListPanel
+                typeVenues={typeVenues}
+                typeVisited={typeVisited}
                 userLocation={userLocation}
-                selectedVenue={selectedVenue}
+                showHeader={false}
                 onVenueClick={(v) => {
                   setSelectedVenue(v);
+                  setSheetState("collapsed");
                 }}
               />
             )}
-
-            {/* VENUE CARD — mobile only (overlay on map) */}
-            {!isDesktop && selectedVenue && (
-              <VenueCard
-                venue={selectedVenue}
-                onClose={() => setSelectedVenue(null)}
-                onCheckin={() => setCheckinModal(true)}
-                style={{
-                  position: "absolute",
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  zIndex: 1000,
-                  background: "linear-gradient(0deg, #0f0f1a 80%, transparent)",
-                  padding: "32px 16px 16px",
-                  animation: "slideUp 0.25s ease",
-                }}
-              />
+            {panel === "achievements" && (
+              <AchievementsPanel visitedCount={visitedCount} />
             )}
-          </div>
+          </BottomSheet>
         )}
 
-        {/* ── SIDEBAR (desktop: always visible — mobile: tab-switched) ── */}
-        {(isDesktop || panel !== "map") && (
+        {/* ── SIDEBAR (desktop only) ── */}
+        {isDesktop && (
           <div
             style={{
-              ...(isDesktop
-                ? {
-                    flex: "0 0 40%",
-                    maxWidth: 520,
-                    borderLeft: "1px solid rgba(255,255,255,0.08)",
-                    display: "flex",
-                    flexDirection: "column",
-                    height: "100%",
-                  }
-                : { height: "100%" }),
+              flex: "0 0 40%",
+              maxWidth: 520,
+              borderLeft: "1px solid rgba(255,255,255,0.08)",
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
             }}
           >
-            {/* VENUE CARD — desktop only (in sidebar) */}
-            {isDesktop && selectedVenue && (
+            {selectedVenue && (
               <VenueCard
                 venue={selectedVenue}
                 onClose={() => setSelectedVenue(null)}
@@ -966,17 +1178,13 @@ export default function App() {
                 style={{ padding: "12px 12px 0", flexShrink: 0 }}
               />
             )}
-
             <div style={{ flex: 1, overflow: "hidden" }}>
-              {(panel === "list" || (isDesktop && panel === "map")) && (
+              {panel === "list" && (
                 <ListPanel
                   typeVenues={typeVenues}
                   typeVisited={typeVisited}
                   userLocation={userLocation}
-                  onVenueClick={(v) => {
-                    setSelectedVenue(v);
-                    if (!isDesktop) setPanel("map");
-                  }}
+                  onVenueClick={(v) => setSelectedVenue(v)}
                 />
               )}
               {panel === "achievements" && (
