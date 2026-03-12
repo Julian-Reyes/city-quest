@@ -116,11 +116,25 @@ const USER_ICON = L.divIcon({
 });
 
 // ─── MAP COMPONENT (react-leaflet) ──────────────────────────────────────────
-function RecenterMap({ center }) {
+function RecenterMap({ center, selectedVenue }) {
   const map = useMap();
+  const hasInitialized = useRef(false);
+
+  // Center on initial load only
   useEffect(() => {
-    if (center) map.setView([center.lat, center.lng], map.getZoom());
+    if (center && !hasInitialized.current) {
+      hasInitialized.current = true;
+      map.setView([center.lat, center.lng], map.getZoom());
+    }
   }, [center]);
+
+  // Center when a venue is selected
+  useEffect(() => {
+    if (selectedVenue) {
+      map.setView([selectedVenue.lat, selectedVenue.lng], map.getZoom());
+    }
+  }, [selectedVenue]);
+
   return null;
 }
 
@@ -139,13 +153,7 @@ function MapView({ venues, userLocation, onVenueClick, selectedVenue }) {
         attribution="&copy; CartoDB"
         maxZoom={19}
       />
-      <RecenterMap
-        center={
-          selectedVenue
-            ? { lat: selectedVenue.lat, lng: selectedVenue.lng }
-            : userLocation
-        }
-      />
+      <RecenterMap center={userLocation} selectedVenue={selectedVenue} />
       {venues.map((venue) => (
         <Marker
           key={venue.id}
@@ -923,6 +931,7 @@ export default function App() {
                   bottom: 0,
                   left: 0,
                   right: 0,
+                  zIndex: 1000,
                   background: "linear-gradient(0deg, #0f0f1a 80%, transparent)",
                   padding: "32px 16px 16px",
                   animation: "slideUp 0.25s ease",
