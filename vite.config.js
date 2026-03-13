@@ -5,7 +5,7 @@ import { VitePWA } from "vite-plugin-pwa";
 // https://vite.dev/config/
 export default defineConfig({
   base: "/city-quest/",
-  envDir: "../secret",
+  envDir: process.env.CI ? "." : "../secret",
   plugins: [
     react(),
     VitePWA({
