@@ -195,10 +195,10 @@ async function fetchGooglePlaceDetails(name, lat, lng) {
       },
       body: JSON.stringify({
         textQuery: name,
-        locationRestriction: {
+        locationBias: {
           circle: {
             center: { latitude: lat, longitude: lng },
-            radius: 200.0,
+            radius: 500.0,
           },
         },
         maxResultCount: 1,
@@ -209,7 +209,8 @@ async function fetchGooglePlaceDetails(name, lat, lng) {
     const place = data.places?.[0];
     if (!place) return null;
 
-    // Reject if Google's result is >250m from OSM coordinates
+    // Compute distance between OSM coords and Google's result
+    let googleDist = null;
     if (place.location) {
       const R = 6371000;
       const dLat = ((place.location.latitude - lat) * Math.PI) / 180;
@@ -219,8 +220,7 @@ async function fetchGooglePlaceDetails(name, lat, lng) {
         Math.cos((lat * Math.PI) / 180) *
           Math.cos((place.location.latitude * Math.PI) / 180) *
           Math.sin(dLng / 2) ** 2;
-      const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      if (dist > 250) return null;
+      googleDist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     // let photo = null;
@@ -258,7 +258,10 @@ async function fetchGooglePlaceDetails(name, lat, lng) {
       price: GOOGLE_PRICE_MAP[place.priceLevel] ?? null,
       hours,
       // review,
-      address: place.formattedAddress || null,
+      address:
+        googleDist !== null && googleDist <= 150
+          ? place.formattedAddress || null
+          : null,
     };
   } catch (err) {
     console.error("Google Places fetch error:", err);
