@@ -102,7 +102,9 @@ async function fetchVenues(lat, lng, type, signal) {
 
 // ─── API BASE URLs (proxy in dev, direct in production) ───────────────────
 const isDev = import.meta.env.DEV;
-const FSQ_BASE = isDev ? "/api/fsq" : "https://fsq-proxy.city-quest.workers.dev";
+const FSQ_BASE = isDev
+  ? "/api/fsq"
+  : "https://fsq-proxy.city-quest.workers.dev";
 const GOOGLE_BASE = isDev ? "/api/google" : "https://places.googleapis.com";
 
 // ─── FOURSQUARE PLACES API ─────────────────────────────────────────────────
@@ -112,7 +114,11 @@ async function fetchFoursquareDetails(name, lat, lng) {
 
   // In dev: send API key directly via Vite proxy. In prod: worker adds it server-side.
   const headers = isDev
-    ? { Authorization: `Bearer ${apiKey}`, Accept: "application/json", "X-Places-Api-Version": "2025-06-17" }
+    ? {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json",
+        "X-Places-Api-Version": "2025-06-17",
+      }
     : { Accept: "application/json" };
 
   try {
@@ -237,8 +243,7 @@ async function fetchGooglePlaceDetails(name, lat, lng) {
 
     let hours = null;
     if (place.currentOpeningHours) {
-      const dayIndex =
-        new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+      const dayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
       hours = {
         open_now: place.currentOpeningHours.openNow,
         display:
@@ -259,7 +264,7 @@ async function fetchGooglePlaceDetails(name, lat, lng) {
       hours,
       // review,
       address:
-        googleDist !== null && googleDist <= 150
+        googleDist !== null && googleDist <= 300
           ? place.formattedAddress || null
           : null,
     };
@@ -443,7 +448,9 @@ function VenueCard({ venue, onClose, onCheckin, style, detailsLoading }) {
                 letterSpacing: 1,
               }}
             >
-              {venue.address?.trim() ? venue.address : goog?.address || venue.address}
+              {venue.address?.trim()
+                ? venue.address
+                : goog?.address || venue.address}
             </div>
           </div>
           <button
@@ -1024,7 +1031,11 @@ export default function App() {
     let cancelled = false;
     setFsqLoading(true);
 
-    fetchFoursquareDetails(selectedVenue.name, selectedVenue.lat, selectedVenue.lng)
+    fetchFoursquareDetails(
+      selectedVenue.name,
+      selectedVenue.lat,
+      selectedVenue.lng,
+    )
       .then((data) => {
         if (cancelled) return;
         const fsqData = data || null;
@@ -1036,9 +1047,7 @@ export default function App() {
           return updated;
         });
         setSelectedVenue((prev) =>
-          prev && prev.id === selectedVenue.id
-            ? { ...prev, fsqData }
-            : prev,
+          prev && prev.id === selectedVenue.id ? { ...prev, fsqData } : prev,
         );
         setFsqLoading(false);
       })
@@ -1046,7 +1055,9 @@ export default function App() {
         if (!cancelled) setFsqLoading(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [selectedVenue?.id]);
 
   // ── Fetch Google Place details on venue selection ──
@@ -1058,7 +1069,11 @@ export default function App() {
     let cancelled = false;
     setGoogleLoading(true);
 
-    fetchGooglePlaceDetails(selectedVenue.name, selectedVenue.lat, selectedVenue.lng)
+    fetchGooglePlaceDetails(
+      selectedVenue.name,
+      selectedVenue.lat,
+      selectedVenue.lng,
+    )
       .then((data) => {
         if (cancelled) return;
         const googleData = data || null;
@@ -1070,9 +1085,7 @@ export default function App() {
           return updated;
         });
         setSelectedVenue((prev) =>
-          prev && prev.id === selectedVenue.id
-            ? { ...prev, googleData }
-            : prev,
+          prev && prev.id === selectedVenue.id ? { ...prev, googleData } : prev,
         );
         setGoogleLoading(false);
       })
@@ -1080,7 +1093,9 @@ export default function App() {
         if (!cancelled) setGoogleLoading(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [selectedVenue?.id]);
 
   // ── Merge helper: combine new venues with existing, preserving visited state ──
