@@ -34,6 +34,12 @@ jobs:
       - uses: actions/configure-pages@v5
 
       - run: npm ci
+
+      - name: Create .env from secrets
+        run: |
+          echo "VITE_FOURSQUARE_API_KEY=${{ secrets.VITE_FOURSQUARE_API_KEY }}" >> .env
+          echo "VITE_GOOGLE_PLACES_KEY=${{ secrets.VITE_GOOGLE_PLACES_KEY }}" >> .env
+
       - run: npm run build
 
       - uses: actions/upload-pages-artifact@v3

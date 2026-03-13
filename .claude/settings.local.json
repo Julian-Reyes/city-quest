@@ -3,7 +3,9 @@
     "allow": [
       "Bash(npx vite:*)",
       "WebSearch",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(source \"$HOME/.nvm/nvm.sh\" && node test-fsq.mjs)",
+      "WebFetch(domain:developers.google.com)"
     ]
   }
 }

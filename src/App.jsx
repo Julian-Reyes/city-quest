@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  useMap,
+  useMapEvents,
+} from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -94,12 +100,163 @@ async function fetchVenues(lat, lng, type, signal) {
     }));
 }
 
+// ─── API BASE URLs (proxy in dev, direct in production) ───────────────────
+const isDev = import.meta.env.DEV;
+const FSQ_BASE = isDev ? "/api/fsq" : "https://fsq-proxy.city-quest.workers.dev";
+const GOOGLE_BASE = isDev ? "/api/google" : "https://places.googleapis.com";
+
+// ─── FOURSQUARE PLACES API ─────────────────────────────────────────────────
+async function fetchFoursquareDetails(name, lat, lng) {
+  const apiKey = import.meta.env.VITE_FOURSQUARE_API_KEY;
+  if (!apiKey) return null;
+
+  // In dev: send API key directly via Vite proxy. In prod: worker adds it server-side.
+  const headers = isDev
+    ? { Authorization: `Bearer ${apiKey}`, Accept: "application/json", "X-Places-Api-Version": "2025-06-17" }
+    : { Accept: "application/json" };
+
+  try {
+    const searchRes = await fetch(
+      `${FSQ_BASE}/places/search?ll=${lat},${lng}&query=${encodeURIComponent(name)}&limit=1`,
+      { headers },
+    );
+    if (!searchRes.ok) return null;
+    const searchData = await searchRes.json();
+    const place = searchData.results?.[0];
+    if (!place) return null;
+
+    const fsqId = place.fsq_place_id;
+
+    // Photos and tips are premium endpoints — commented out to save API costs
+    // const [photoRes, tipsRes] = await Promise.all([
+    //   fetch(
+    //     `${FSQ_BASE}/places/${fsqId}/photos?limit=1`,
+    //     { headers },
+    //   ).catch(() => null),
+    //   fetch(
+    //     `${FSQ_BASE}/places/${fsqId}/tips?limit=1`,
+    //     { headers },
+    //   ).catch(() => null),
+    // ]);
+
+    // let photo = null;
+    // if (photoRes?.ok) {
+    //   const photos = await photoRes.json();
+    //   if (photos?.[0]) {
+    //     photo = `${photos[0].prefix}300x200${photos[0].suffix}`;
+    //   }
+    // }
+
+    // let tip = null;
+    // if (tipsRes?.ok) {
+    //   const tips = await tipsRes.json();
+    //   if (tips?.[0]?.text) {
+    //     tip = tips[0].text;
+    //   }
+    // }
+
+    return {
+      // photo,
+      category: place.categories?.[0]?.name || null,
+      price: place.price || null,
+      rating: place.rating || null,
+      hours: place.hours
+        ? { open_now: place.hours.open_now, display: place.hours.display }
+        : null,
+      // tip,
+    };
+  } catch (err) {
+    console.error("Foursquare fetch error:", err);
+    return null;
+  }
+}
+
+// ─── GOOGLE PLACES API (New) ───────────────────────────────────────────────
+const GOOGLE_PRICE_MAP = {
+  PRICE_LEVEL_INEXPENSIVE: 1,
+  PRICE_LEVEL_MODERATE: 2,
+  PRICE_LEVEL_EXPENSIVE: 3,
+  PRICE_LEVEL_VERY_EXPENSIVE: 4,
+};
+
+async function fetchGooglePlaceDetails(name, lat, lng) {
+  const apiKey = import.meta.env.VITE_GOOGLE_PLACES_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const searchRes = await fetch(`${GOOGLE_BASE}/v1/places:searchText`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask":
+          // "places.id,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.reviews",
+          "places.id,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours",
+      },
+      body: JSON.stringify({
+        textQuery: name,
+        locationBias: {
+          circle: {
+            center: { latitude: lat, longitude: lng },
+            radius: 500.0,
+          },
+        },
+        maxResultCount: 1,
+      }),
+    });
+    if (!searchRes.ok) return null;
+    const data = await searchRes.json();
+    const place = data.places?.[0];
+    if (!place) return null;
+
+    // let photo = null;
+    // if (place.photos?.[0]?.name) {
+    //   const photoRes = await fetch(
+    //     `${GOOGLE_BASE}/v1/${place.photos[0].name}/media?maxHeightPx=300&skipHttpRedirect=true`,
+    //     { headers: { "X-Goog-Api-Key": apiKey } },
+    //   );
+    //   if (photoRes.ok) {
+    //     const photoData = await photoRes.json();
+    //     photo = photoData.photoUri || null;
+    //   }
+    // }
+
+    let hours = null;
+    if (place.currentOpeningHours) {
+      const dayIndex =
+        new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+      hours = {
+        open_now: place.currentOpeningHours.openNow,
+        display:
+          place.currentOpeningHours.weekdayDescriptions?.[dayIndex] || null,
+      };
+    }
+
+    // let review = null;
+    // if (place.reviews?.[0]?.text?.text) {
+    //   review = place.reviews[0].text.text;
+    // }
+
+    return {
+      // photo,
+      rating: place.rating || null,
+      ratingCount: place.userRatingCount || null,
+      price: GOOGLE_PRICE_MAP[place.priceLevel] ?? null,
+      hours,
+      // review,
+    };
+  } catch (err) {
+    console.error("Google Places fetch error:", err);
+    return null;
+  }
+}
+
 // ─── MARKER ICON HELPERS ────────────────────────────────────────────────────
-function venueIcon(venue, isSelected) {
+function venueIcon(venue, isSelected, isMobile = false) {
   const color = venue.visited
     ? "#22c55e"
     : VENUE_TYPES.find((t) => t.id === venue.type)?.color || "#f59e0b";
-  const size = isSelected ? 20 : 14;
+  const size = isSelected ? (isMobile ? 34 : 20) : isMobile ? 23 : 14;
   return L.divIcon({
     className: "",
     html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid ${venue.visited ? "#22c55e" : "rgba(255,255,255,0.4)"};box-shadow:0 0 ${venue.visited ? "8px" : "4px"} ${color};cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;font-size:${size * 0.55}px">${venue.visited ? "✓" : VENUE_TYPES.find((t) => t.id === venue.type)?.emoji || "📍"}</div>`,
@@ -108,12 +265,15 @@ function venueIcon(venue, isSelected) {
   });
 }
 
-const USER_ICON = L.divIcon({
-  className: "",
-  html: `<div style="width:16px;height:16px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 0 0 4px rgba(59,130,246,0.3)"></div>`,
-  iconSize: [16, 16],
-  iconAnchor: [8, 8],
-});
+function userIcon(isMobile = false) {
+  const size = isMobile ? 24 : 16;
+  return L.divIcon({
+    className: "",
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 0 0 4px rgba(59,130,246,0.3)"></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
 
 // ─── MAP COMPONENT (react-leaflet) ──────────────────────────────────────────
 function RecenterMap({ center, selectedVenue }) {
@@ -144,7 +304,12 @@ function MapMoveDetector({ fetchCenter, onSearchArea }) {
       if (!fetchCenter) return;
       const center = map.getCenter();
       const zoom = map.getZoom();
-      const dist = distanceMiles(fetchCenter.lat, fetchCenter.lng, center.lat, center.lng);
+      const dist = distanceMiles(
+        fetchCenter.lat,
+        fetchCenter.lng,
+        center.lat,
+        center.lng,
+      );
       if (zoom >= 12 && dist > 1.5) {
         onSearchArea({ lat: center.lat, lng: center.lng, zoom });
       } else {
@@ -155,7 +320,16 @@ function MapMoveDetector({ fetchCenter, onSearchArea }) {
   return null;
 }
 
-function MapView({ venues, userLocation, onVenueClick, selectedVenue, fetchCenter, onSearchArea, searchArea }) {
+function MapView({
+  venues,
+  userLocation,
+  onVenueClick,
+  selectedVenue,
+  fetchCenter,
+  onSearchArea,
+  searchArea,
+  isMobile,
+}) {
   const center = userLocation || { lat: 37.7749, lng: -122.4194 };
 
   return (
@@ -176,14 +350,14 @@ function MapView({ venues, userLocation, onVenueClick, selectedVenue, fetchCente
         <Marker
           key={venue.id}
           position={[venue.lat, venue.lng]}
-          icon={venueIcon(venue, selectedVenue?.id === venue.id)}
+          icon={venueIcon(venue, selectedVenue?.id === venue.id, isMobile)}
           eventHandlers={{ click: () => onVenueClick(venue) }}
         />
       ))}
       {userLocation && (
         <Marker
           position={[userLocation.lat, userLocation.lng]}
-          icon={USER_ICON}
+          icon={userIcon(isMobile)}
         />
       )}
     </MapContainer>
@@ -205,8 +379,22 @@ function useIsDesktop() {
 }
 
 // ─── VENUE CARD (shared between mobile overlay & desktop sidebar) ───────────
-function VenueCard({ venue, onClose, onCheckin, style }) {
+function VenueCard({ venue, onClose, onCheckin, style, detailsLoading }) {
   if (!venue) return null;
+  const fsq = venue.fsqData;
+  const goog = venue.googleData;
+  const price = goog?.price ?? fsq?.price;
+  const priceStr = price ? "$".repeat(price) : null;
+  const rating = goog?.rating ?? fsq?.rating;
+  const ratingStr =
+    rating != null
+      ? `⭐ ${rating.toFixed(1)}${goog?.ratingCount ? ` (${goog.ratingCount})` : ""}`
+      : null;
+  const hours = goog?.hours || fsq?.hours;
+  // const venuePhoto = goog?.photo || fsq?.photo;
+  // const tip = goog?.review || fsq?.tip;
+  const detailParts = [fsq?.category, priceStr, ratingStr].filter(Boolean);
+
   return (
     <div style={style}>
       <div
@@ -256,6 +444,69 @@ function VenueCard({ venue, onClose, onCheckin, style }) {
             ×
           </button>
         </div>
+        {detailParts.length > 0 && (
+          <div
+            style={{
+              fontSize: 12,
+              color: "rgba(255,255,255,0.6)",
+              marginBottom: 6,
+            }}
+          >
+            {detailParts.join(" · ")}
+          </div>
+        )}
+        {hours && (
+          <div
+            style={{
+              fontSize: 12,
+              color: hours.open_now ? "#22c55e" : "#ef4444",
+              marginBottom: 10,
+            }}
+          >
+            {hours.open_now ? "🟢" : "🔴"}{" "}
+            {hours.display || (hours.open_now ? "Open now" : "Closed")}
+          </div>
+        )}
+        {/* venuePhoto and tip/review commented out to save API costs
+        {venuePhoto && (
+          <img
+            src={venuePhoto}
+            alt=""
+            style={{
+              width: "100%",
+              borderRadius: 8,
+              marginBottom: 10,
+              maxHeight: 200,
+              objectFit: "cover",
+            }}
+          />
+        )}
+        {tip && (
+          <div
+            style={{
+              fontSize: 12,
+              color: "rgba(255,255,255,0.5)",
+              fontStyle: "italic",
+              marginBottom: 12,
+              lineHeight: 1.4,
+            }}
+          >
+            &ldquo;{tip}&rdquo;
+          </div>
+        )}
+        */}
+        {detailsLoading && (
+          <div
+            style={{
+              fontSize: 11,
+              color: "rgba(255,255,255,0.3)",
+              marginBottom: 10,
+              letterSpacing: 1,
+            }}
+          >
+            Loading details...
+          </div>
+        )}
         {venue.visited && (
           <div style={{ marginBottom: 14, fontSize: 12, color: "#22c55e" }}>
             ✓ Visited {new Date(venue.visitedAt).toLocaleDateString()}
@@ -328,10 +579,20 @@ function distanceMiles(lat1, lng1, lat2, lng2) {
 }
 
 // ─── SIDEBAR CONTENT ────────────────────────────────────────────────────────
-function ListPanel({ typeVenues, typeVisited, onVenueClick, userLocation, showHeader = true }) {
+function ListPanel({
+  typeVenues,
+  typeVisited,
+  onVenueClick,
+  userLocation,
+  showHeader = true,
+}) {
   return (
     <div
-      style={{ height: "100%", overflowY: "auto", padding: showHeader ? "12px 12px 80px" : "4px 12px 80px" }}
+      style={{
+        height: "100%",
+        overflowY: "auto",
+        padding: showHeader ? "12px 12px 80px" : "4px 12px 80px",
+      }}
     >
       {showHeader && (
         <div
@@ -523,28 +784,38 @@ function BottomSheet({ sheetState, onStateChange, children, dragLabel }) {
 
   const getTranslateY = (state) => {
     switch (state) {
-      case "expanded": return 15;
-      case "peek": return 70;
-      case "collapsed": return 92;
-      default: return 70;
+      case "expanded":
+        return 15;
+      case "peek":
+        return 70;
+      case "collapsed":
+        return 92;
+      default:
+        return 70;
     }
   };
 
-  const handleTouchStart = useCallback((e) => {
-    dragRef.current = {
-      startY: e.touches[0].clientY,
-      startTranslate: getTranslateY(sheetState),
-      isDragging: true,
-    };
-    if (sheetRef.current) sheetRef.current.style.transition = "none";
-  }, [sheetState]);
+  const handleTouchStart = useCallback(
+    (e) => {
+      dragRef.current = {
+        startY: e.touches[0].clientY,
+        startTranslate: getTranslateY(sheetState),
+        isDragging: true,
+      };
+      if (sheetRef.current) sheetRef.current.style.transition = "none";
+    },
+    [sheetState],
+  );
 
   const handleTouchMove = useCallback((e) => {
     if (!dragRef.current.isDragging || !sheetRef.current) return;
     const deltaY = e.touches[0].clientY - dragRef.current.startY;
     const containerHeight = sheetRef.current.parentElement.offsetHeight;
     const deltaPercent = (deltaY / containerHeight) * 100;
-    const newTranslate = Math.max(15, Math.min(92, dragRef.current.startTranslate + deltaPercent));
+    const newTranslate = Math.max(
+      15,
+      Math.min(92, dragRef.current.startTranslate + deltaPercent),
+    );
     sheetRef.current.style.transform = `translateY(${newTranslate}%)`;
   }, []);
 
@@ -552,7 +823,9 @@ function BottomSheet({ sheetState, onStateChange, children, dragLabel }) {
     if (!dragRef.current.isDragging || !sheetRef.current) return;
     dragRef.current.isDragging = false;
     sheetRef.current.style.transition = "transform 0.3s ease";
-    const match = sheetRef.current.style.transform.match(/translateY\(([\d.]+)%\)/);
+    const match = sheetRef.current.style.transform.match(
+      /translateY\(([\d.]+)%\)/,
+    );
     const currentY = match ? parseFloat(match[1]) : getTranslateY(sheetState);
     let target;
     if (currentY < 42) target = "expanded";
@@ -593,31 +866,37 @@ function BottomSheet({ sheetState, onStateChange, children, dragLabel }) {
           flexShrink: 0,
         }}
       >
-        <div style={{
-          width: 36,
-          height: 4,
-          background: "rgba(255,255,255,0.2)",
-          borderRadius: 2,
-          margin: "0 auto 10px",
-        }} />
+        <div
+          style={{
+            width: 36,
+            height: 4,
+            background: "rgba(255,255,255,0.2)",
+            borderRadius: 2,
+            margin: "0 auto 10px",
+          }}
+        />
         {dragLabel && (
-          <div style={{
-            color: "rgba(255,255,255,0.4)",
-            fontSize: 11,
-            letterSpacing: 2,
-            textTransform: "uppercase",
-          }}>
+          <div
+            style={{
+              color: "rgba(255,255,255,0.4)",
+              fontSize: 11,
+              letterSpacing: 2,
+              textTransform: "uppercase",
+            }}
+          >
             {dragLabel}
           </div>
         )}
       </div>
 
       {/* Scrollable content */}
-      <div style={{
-        flex: 1,
-        overflowY: "auto",
-        overscrollBehavior: "contain",
-      }}>
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          overscrollBehavior: "contain",
+        }}
+      >
         {children}
       </div>
     </div>
@@ -640,6 +919,8 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [newAchievement, setNewAchievement] = useState(null);
   const [searchArea, setSearchArea] = useState(null); // {lat, lng} when user pans far enough
+  const [fsqLoading, setFsqLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const fileInputRef = useRef(null);
   const venueCacheRef = useRef({});
 
@@ -715,13 +996,89 @@ export default function App() {
       .catch(() => {});
   }, [fetchCenter]);
 
+  // ── Fetch Foursquare details on venue selection ──
+  useEffect(() => {
+    if (!selectedVenue || selectedVenue.fsqData !== undefined) {
+      setFsqLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setFsqLoading(true);
+
+    fetchFoursquareDetails(selectedVenue.name, selectedVenue.lat, selectedVenue.lng)
+      .then((data) => {
+        if (cancelled) return;
+        const fsqData = data || null;
+        setVenues((prev) => {
+          const updated = prev.map((v) =>
+            v.id === selectedVenue.id ? { ...v, fsqData } : v,
+          );
+          venueCacheRef.current[activeType] = updated;
+          return updated;
+        });
+        setSelectedVenue((prev) =>
+          prev && prev.id === selectedVenue.id
+            ? { ...prev, fsqData }
+            : prev,
+        );
+        setFsqLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setFsqLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [selectedVenue?.id]);
+
+  // ── Fetch Google Place details on venue selection ──
+  useEffect(() => {
+    if (!selectedVenue || selectedVenue.googleData !== undefined) {
+      setGoogleLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setGoogleLoading(true);
+
+    fetchGooglePlaceDetails(selectedVenue.name, selectedVenue.lat, selectedVenue.lng)
+      .then((data) => {
+        if (cancelled) return;
+        const googleData = data || null;
+        setVenues((prev) => {
+          const updated = prev.map((v) =>
+            v.id === selectedVenue.id ? { ...v, googleData } : v,
+          );
+          venueCacheRef.current[activeType] = updated;
+          return updated;
+        });
+        setSelectedVenue((prev) =>
+          prev && prev.id === selectedVenue.id
+            ? { ...prev, googleData }
+            : prev,
+        );
+        setGoogleLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setGoogleLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [selectedVenue?.id]);
+
   // ── Merge helper: combine new venues with existing, preserving visited state ──
   const mergeVenues = useCallback((existing, fetched) => {
     const map = new Map(existing.map((v) => [v.id, v]));
     for (const v of fetched) {
       if (map.has(v.id)) {
         const old = map.get(v.id);
-        map.set(v.id, { ...v, visited: old.visited, visitedAt: old.visitedAt, photo: old.photo, note: old.note });
+        map.set(v.id, {
+          ...v,
+          visited: old.visited,
+          visitedAt: old.visitedAt,
+          photo: old.photo,
+          note: old.note,
+          fsqData: old.fsqData,
+          googleData: old.googleData,
+        });
       } else {
         map.set(v.id, v);
       }
@@ -761,7 +1118,6 @@ export default function App() {
   const handleSearchArea = useCallback(() => {
     if (!searchArea) return;
     const controller = new AbortController();
-    setLoading(true);
     setSearchArea(null);
     const newCenter = { lat: searchArea.lat, lng: searchArea.lng };
     setFetchCenter(newCenter);
@@ -1010,9 +1366,7 @@ export default function App() {
               alignItems: "center",
               gap: 2,
               borderBottom:
-                panel === id
-                  ? "2px solid #f59e0b"
-                  : "2px solid transparent",
+                panel === id ? "2px solid #f59e0b" : "2px solid transparent",
             }}
           >
             <span style={{ fontSize: 16 }}>{icon}</span>
@@ -1074,6 +1428,7 @@ export default function App() {
               fetchCenter={fetchCenter}
               searchArea={searchArea}
               onSearchArea={setSearchArea}
+              isMobile={!isDesktop}
               onVenueClick={(v) => {
                 setSelectedVenue(v);
                 if (!isDesktop) setSheetState("collapsed");
@@ -1114,6 +1469,7 @@ export default function App() {
           {!isDesktop && selectedVenue && (
             <VenueCard
               venue={selectedVenue}
+              detailsLoading={fsqLoading || googleLoading}
               onClose={() => {
                 setSelectedVenue(null);
                 setSheetState("peek");
@@ -1138,7 +1494,11 @@ export default function App() {
           <BottomSheet
             sheetState={sheetState}
             onStateChange={setSheetState}
-            dragLabel={panel === "list" ? `${typeVisited} of ${typeVenues.length} visited` : null}
+            dragLabel={
+              panel === "list"
+                ? `${typeVisited} of ${typeVenues.length} visited`
+                : null
+            }
           >
             {panel === "list" && (
               <ListPanel
@@ -1173,6 +1533,7 @@ export default function App() {
             {selectedVenue && (
               <VenueCard
                 venue={selectedVenue}
+                detailsLoading={fsqLoading || googleLoading}
                 onClose={() => setSelectedVenue(null)}
                 onCheckin={() => setCheckinModal(true)}
                 style={{ padding: "12px 12px 0", flexShrink: 0 }}

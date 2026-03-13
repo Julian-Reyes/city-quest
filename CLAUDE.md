@@ -116,6 +116,89 @@ Add a `manifest.json` and service worker so the app installs on iPhone/Android:
 - Display: `standalone`
 - Icons: generate a simple emoji-based icon at 192x192 and 512x512
 
+TODO: ### 7. Add venue details via Foursquare Places API (next session)                                        
+                                                                                                       
+ Context
+
+ Venue cards currently only show name and address. Adding Foursquare data (photos, category, price,
+ rating, hours, tips) will make venues feel real and help users decide where to go.
+
+ File to modify
+
+ /Users/apple/Documents/GitHub/city-quest/src/App.jsx
+
+ Setup
+
+ 1. Sign up at https://foursquare.com/developers
+ 2. Create a project, get an API key
+ 3. Create .env file in project root:
+ VITE_FOURSQUARE_API_KEY=your_key_here
+
+ Implementation
+
+ 1. Foursquare fetch function
+
+ Single function fetchFoursquareDetails(name, lat, lng) that:
+ - Searches: GET /v3/places/search?ll={lat},{lng}&query={name}&limit=1
+   - Returns: fsq_id, categories, price, rating, hours, location
+ - Fetches photo: GET /v3/places/{fsq_id}/photos?limit=1
+ - Fetches tips: GET /v3/places/{fsq_id}/tips?limit=1
+ - Returns an object:
+ {
+   photo: "https://...",           // "300x200" sized photo URL
+   category: "Cocktail Bar",      // primary category name
+   price: 3,                      // 1-4 scale ($ to $$$$)
+   rating: 8.4,                   // out of 10
+   hours: { open_now: true, display: "Open until 2 AM" },
+   tip: "Try the Old Fashioned",  // top user tip
+ }
+
+ 2. Fetch on venue selection
+
+ - When user taps a venue, check if it already has fsqData
+ - If not, fetch from Foursquare and store on the venue object
+ - Cache result so re-selecting doesn't re-fetch
+ - Graceful fallback if API key missing or request fails
+
+ 3. Update VenueCard layout
+
+ After venue name/address, add a details row:
+
+ ┌─────────────────────────┐
+ │ Venue Name            × │
+ │ 123 Main Street         │
+ │ Cocktail Bar · $$$ · 8.4│
+ │ 🟢 Open until 2 AM      │
+ │ ┌─────────────────────┐ │
+ │ │     [photo]         │ │
+ │ └─────────────────────┘ │
+ │ "Try the Old Fashioned" │
+ │ [📍 Check In Here]      │
+ └─────────────────────────┘
+
+ - Category + price: "Cocktail Bar · $$$" — price as dollar signs
+ - Rating: small badge, e.g. "⭐ 8.4"
+ - Hours: green/red dot + status text
+ - Photo: full width, 200px max height (existing style)
+ - Tip: italic quote below photo
+ - All fields optional — only show what's available
+
+ 4. State management
+
+ - Add fsqData field to venue objects (default null)
+ - When fetched, update venue in venues array via setVenues
+ - Persists in venueCacheRef
+
+ Verification
+
+ 1. Add API key to .env, restart dev server
+ 2. Tap a venue — card should show category, price, rating, hours, photo, tip
+ 3. Fields that Foursquare doesn't have for a venue should gracefully not appear
+ 4. Re-selecting same venue loads instantly (cached)
+ 5. Works on both mobile and desktop
+ 6. No errors if API key is missing
+
+
 ---
 
 ## Tech Stack

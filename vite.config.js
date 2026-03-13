@@ -5,6 +5,7 @@ import { VitePWA } from "vite-plugin-pwa";
 // https://vite.dev/config/
 export default defineConfig({
   base: "/city-quest/",
+  envDir: "../secret",
   plugins: [
     react(),
     VitePWA({
@@ -31,5 +32,17 @@ export default defineConfig({
   server: {
     port: 5174,
     host: true,
+    proxy: {
+      "/api/fsq": {
+        target: "https://places-api.foursquare.com",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/fsq/, ""),
+      },
+      "/api/google": {
+        target: "https://places.googleapis.com",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/google/, ""),
+      },
+    },
   },
 });
