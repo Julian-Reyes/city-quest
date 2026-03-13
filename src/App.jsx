@@ -108,7 +108,7 @@ const GOOGLE_BASE = isDev ? "/api/google" : "https://places.googleapis.com";
 // ─── FOURSQUARE PLACES API ─────────────────────────────────────────────────
 async function fetchFoursquareDetails(name, lat, lng) {
   const apiKey = import.meta.env.VITE_FOURSQUARE_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey && isDev) return null; // In prod, worker handles auth — no key needed
 
   // In dev: send API key directly via Vite proxy. In prod: worker adds it server-side.
   const headers = isDev
