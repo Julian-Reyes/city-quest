@@ -191,7 +191,7 @@ async function fetchGooglePlaceDetails(name, lat, lng) {
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask":
           // "places.id,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.reviews",
-          "places.id,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours",
+          "places.id,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.formattedAddress",
       },
       body: JSON.stringify({
         textQuery: name,
@@ -244,6 +244,7 @@ async function fetchGooglePlaceDetails(name, lat, lng) {
       price: GOOGLE_PRICE_MAP[place.priceLevel] ?? null,
       hours,
       // review,
+      address: place.formattedAddress || null,
     };
   } catch (err) {
     console.error("Google Places fetch error:", err);
@@ -425,7 +426,7 @@ function VenueCard({ venue, onClose, onCheckin, style, detailsLoading }) {
                 letterSpacing: 1,
               }}
             >
-              {venue.address}
+              {venue.address?.trim() ? venue.address : goog?.address || venue.address}
             </div>
           </div>
           <button

@@ -5,7 +5,9 @@
       "WebSearch",
       "Bash(npm run:*)",
       "Bash(source \"$HOME/.nvm/nvm.sh\" && node test-fsq.mjs)",
-      "WebFetch(domain:developers.google.com)"
+      "WebFetch(domain:developers.google.com)",
+      "WebFetch(domain:stadiamaps.com)",
+      "WebFetch(domain:docs.stadiamaps.com)"
     ]
   }
 }
