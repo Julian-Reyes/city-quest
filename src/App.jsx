@@ -191,14 +191,14 @@ async function fetchGooglePlaceDetails(name, lat, lng) {
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask":
           // "places.id,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.reviews",
-          "places.id,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.formattedAddress",
+          "places.id,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.formattedAddress,places.location",
       },
       body: JSON.stringify({
         textQuery: name,
-        locationBias: {
+        locationRestriction: {
           circle: {
             center: { latitude: lat, longitude: lng },
-            radius: 500.0,
+            radius: 200.0,
           },
         },
         maxResultCount: 1,
@@ -208,6 +208,20 @@ async function fetchGooglePlaceDetails(name, lat, lng) {
     const data = await searchRes.json();
     const place = data.places?.[0];
     if (!place) return null;
+
+    // Reject if Google's result is >250m from OSM coordinates
+    if (place.location) {
+      const R = 6371000;
+      const dLat = ((place.location.latitude - lat) * Math.PI) / 180;
+      const dLng = ((place.location.longitude - lng) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat * Math.PI) / 180) *
+          Math.cos((place.location.latitude * Math.PI) / 180) *
+          Math.sin(dLng / 2) ** 2;
+      const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      if (dist > 250) return null;
+    }
 
     // let photo = null;
     // if (place.photos?.[0]?.name) {
