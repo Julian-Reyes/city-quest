@@ -340,8 +340,8 @@ function MapView({
       style={{ width: "100%", height: "100%", background: "#1a1a2e" }}
     >
       <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        attribution="&copy; CartoDB"
+        url="https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
+        attribution="&copy; Stadia Maps"
         maxZoom={19}
       />
       <RecenterMap center={userLocation} selectedVenue={selectedVenue} />
@@ -919,6 +919,7 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [newAchievement, setNewAchievement] = useState(null);
   const [searchArea, setSearchArea] = useState(null); // {lat, lng} when user pans far enough
+
   const [fsqLoading, setFsqLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const fileInputRef = useRef(null);
