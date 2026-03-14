@@ -803,7 +803,13 @@ function AchievementsPanel({ visitedCount }) {
 }
 
 // ─── BOTTOM SHEET (mobile only) ──────────────────────────────────────────────
-function BottomSheet({ sheetState, onStateChange, children, dragLabel }) {
+function BottomSheet({
+  sheetState,
+  onStateChange,
+  children,
+  dragLabel,
+  peekPercent = 80,
+}) {
   const sheetRef = useRef(null);
   const dragRef = useRef({ startY: 0, startTranslate: 0, isDragging: false });
 
@@ -812,7 +818,7 @@ function BottomSheet({ sheetState, onStateChange, children, dragLabel }) {
       case "expanded":
         return 15;
       case "peek":
-        return 80;
+        return peekPercent;
       case "collapsed":
         return 92;
       default:
@@ -853,8 +859,9 @@ function BottomSheet({ sheetState, onStateChange, children, dragLabel }) {
     );
     const currentY = match ? parseFloat(match[1]) : getTranslateY(sheetState);
     let target;
-    if (currentY < 48) target = "expanded";
-    else if (currentY < 86) target = "peek";
+    const peekY = getTranslateY("peek");
+    if (currentY < (15 + peekY) / 2) target = "expanded";
+    else if (currentY < (peekY + 92) / 2) target = "peek";
     else target = "collapsed";
     onStateChange(target);
     sheetRef.current.style.transform = `translateY(${getTranslateY(target)}%)`;
@@ -1342,7 +1349,17 @@ export default function App() {
               gap: 2,
             }}
           >
-            <span style={{ fontSize: isDesktop ? 18 : 14 }}>{t.emoji}</span>
+            <span
+              style={{
+                fontSize: isDesktop ? 18 : 17,
+                height: 22,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {t.emoji}
+            </span>
             {t.label}
           </button>
         ))}
@@ -1377,9 +1394,9 @@ export default function App() {
         }}
       >
         {[
-          ["list", "📋", "List"],
-          ["achievements", "🏆", "Awards"],
-        ].map(([id, icon, label]) => (
+          ["list", "📋", "List", 0],
+          ["achievements", "🏆", "Awards", 3],
+        ].map(([id, icon, label, iconPadTop]) => (
           <button
             key={id}
             onClick={() => setPanel(id)}
@@ -1403,7 +1420,18 @@ export default function App() {
                 panel === id ? "2px solid #f59e0b" : "2px solid transparent",
             }}
           >
-            <span style={{ fontSize: isDesktop ? 16 : 13 }}>{icon}</span>
+            <span
+              style={{
+                fontSize: isDesktop ? 16 : 15,
+                height: 20,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                paddingTop: iconPadTop,
+              }}
+            >
+              {icon}
+            </span>
             {label}
           </button>
         ))}
@@ -1528,6 +1556,7 @@ export default function App() {
           <BottomSheet
             sheetState={sheetState}
             onStateChange={setSheetState}
+            peekPercent={panel === "achievements" ? 63 : 80}
             dragLabel={
               panel === "list"
                 ? `${typeVisited} of ${typeVenues.length} visited`
