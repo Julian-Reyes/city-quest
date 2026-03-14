@@ -55,6 +55,27 @@ const ACHIEVEMENTS = [
   },
 ];
 
+// ─── API CACHE (localStorage) ────────────────────────────────────────────────
+const CACHE_KEY = "cityquest_api_cache";
+const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+function getApiCache(venueId, source) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
+    const entry = cache[`${source}_${venueId}`];
+    if (entry && Date.now() - entry.ts < CACHE_TTL) return entry.data;
+  } catch {}
+  return undefined;
+}
+
+function setApiCache(venueId, source, data) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
+    cache[`${source}_${venueId}`] = { data, ts: Date.now() };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+  } catch {}
+}
+
 // ─── OVERPASS API (OpenStreetMap) ────────────────────────────────────────────
 function buildAddress(tags) {
   const num = tags["addr:housenumber"] || "";
@@ -1035,6 +1056,24 @@ export default function App() {
       setFsqLoading(false);
       return;
     }
+
+    const cached = getApiCache(selectedVenue.id, "fsq");
+    if (cached !== undefined) {
+      const fsqData = cached;
+      setVenues((prev) => {
+        const updated = prev.map((v) =>
+          v.id === selectedVenue.id ? { ...v, fsqData } : v,
+        );
+        venueCacheRef.current[activeType] = updated;
+        return updated;
+      });
+      setSelectedVenue((prev) =>
+        prev && prev.id === selectedVenue.id ? { ...prev, fsqData } : prev,
+      );
+      setFsqLoading(false);
+      return;
+    }
+
     let cancelled = false;
     setFsqLoading(true);
 
@@ -1046,6 +1085,7 @@ export default function App() {
       .then((data) => {
         if (cancelled) return;
         const fsqData = data || null;
+        setApiCache(selectedVenue.id, "fsq", fsqData);
         setVenues((prev) => {
           const updated = prev.map((v) =>
             v.id === selectedVenue.id ? { ...v, fsqData } : v,
@@ -1073,6 +1113,24 @@ export default function App() {
       setGoogleLoading(false);
       return;
     }
+
+    const cached = getApiCache(selectedVenue.id, "google");
+    if (cached !== undefined) {
+      const googleData = cached;
+      setVenues((prev) => {
+        const updated = prev.map((v) =>
+          v.id === selectedVenue.id ? { ...v, googleData } : v,
+        );
+        venueCacheRef.current[activeType] = updated;
+        return updated;
+      });
+      setSelectedVenue((prev) =>
+        prev && prev.id === selectedVenue.id ? { ...prev, googleData } : prev,
+      );
+      setGoogleLoading(false);
+      return;
+    }
+
     let cancelled = false;
     setGoogleLoading(true);
 
@@ -1084,6 +1142,7 @@ export default function App() {
       .then((data) => {
         if (cancelled) return;
         const googleData = data || null;
+        setApiCache(selectedVenue.id, "google", googleData);
         setVenues((prev) => {
           const updated = prev.map((v) =>
             v.id === selectedVenue.id ? { ...v, googleData } : v,

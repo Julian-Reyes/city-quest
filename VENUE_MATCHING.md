@@ -50,10 +50,10 @@ The core issue is **OSM data quality**, not just matching accuracy. Many venues 
   - Add `places.displayName` to field mask and validate name similarity
   - Reject results where Google's name doesn't match OSM's name
   - Add `&radius=500` to Foursquare search
-- **Phase 2** — Per-user IndexedDB cache:
-  - Cache Google Place IDs after first successful match
-  - Re-lookups use Place Details by ID ($0.005) instead of Text Search ($0.032) — 6x cheaper, deterministic
-  - TTL: 24 hours
+- **Phase 2** — ~~Per-user IndexedDB cache~~ ✅ Done via localStorage (simpler, sufficient for now):
+  - API responses cached under `cityquest_api_cache` with 7-day TTL
+  - Caches `null` for no-match results to avoid re-fetching ghost venues
+  - IndexedDB not needed at this scale
 - **Phase 3** — Shared Cloudflare Worker + KV cache:
   - First user to look up a venue pays $0.032, all others get cached result for free
   - Extend existing `workers/fsq-proxy/worker.js` with `GET /venue/{osmId}` endpoint
@@ -159,5 +159,5 @@ NOT yet implemented:
 - `osmTags` preservation on venue objects
 - Richer `textQuery` with address context
 - Name similarity validation (`places.displayName`)
-- Any caching (IndexedDB or Cloudflare KV)
+- ~~Any caching (IndexedDB or Cloudflare KV)~~ → Client-side localStorage cache implemented (7-day TTL). Cloudflare KV (Phase 3) NOT yet done.
 - Stale venue filtering/hiding

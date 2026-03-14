@@ -46,8 +46,9 @@ Google gives $200/month free credit = ~4,750 clicks/month.
 
 Caching alone can reduce API costs by 80-90%.
 
-### Client-side cache
-- localStorage keyed by place ID
+### Client-side cache ✅ IMPLEMENTED
+- localStorage keyed by venue ID + source (`google_` / `fsq_` prefix), under `cityquest_api_cache`
+- 7-day TTL, caches `null` for no-match results
 - Reduces repeat clicks on same venue per user
 - No backend needed
 

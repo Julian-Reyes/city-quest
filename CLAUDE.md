@@ -90,6 +90,13 @@ A single-file React app (Vite project) with the following working:
 ### Photos & Reviews — CURRENTLY DISABLED
 Photos and reviews are commented out to save API costs. See `REIMPLEMENT_PHOTOS_REVIEWS.md` for a step-by-step guide to re-enable them (with cost breakdown and partial re-enable options). When re-enabled, also apply CSS image filters (TODO in that file).
 
+### API Response Cache
+- Google + Foursquare API responses cached in localStorage under key `cityquest_api_cache`
+- 7-day TTL — entries auto-expire and re-fetch from API
+- `null` results cached too (prevents re-fetching venues that don't exist in Google/Foursquare)
+- Helpers: `getApiCache(venueId, source)` / `setApiCache(venueId, source, data)` in App.jsx
+- `undefined` = cache miss, `null` = API returned no match (important distinction)
+
 ### Env Setup (local dev)
 - `.env` lives in `../secret/` (sibling directory to repo) — keeps keys out of git
 - `vite.config.js` uses `envDir: process.env.CI ? "." : "../secret"` — reads from repo root in CI, sibling folder locally
