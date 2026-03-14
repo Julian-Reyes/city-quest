@@ -90,18 +90,16 @@ function filterGhostVenues(venues) {
   return venues.filter((v) => {
     // If venue already has googleData in memory, use that
     if (v.googleData !== undefined) {
-      return !(
-        v.googleData === null &&
-        (!v.address || v.address.trim() === "")
-      );
+      const noGoogleAddr =
+        v.googleData === null || (v.googleData && !v.googleData.address);
+      return !(noGoogleAddr && (!v.address || v.address.trim() === ""));
     }
     // Otherwise check localStorage cache
     const entry = cache[`google_${v.id}`];
     if (entry && now - entry.ts < CACHE_TTL) {
-      if (
-        entry.data === null &&
-        (!v.address || v.address.trim() === "")
-      )
+      const noGoogleAddr =
+        entry.data === null || (entry.data && !entry.data.address);
+      if (noGoogleAddr && (!v.address || v.address.trim() === ""))
         return false;
     }
     return true;
@@ -1014,8 +1012,10 @@ export default function App() {
   const typeVenues = useMemo(() => {
     const filtered = venues.filter((v) => {
       if (v.type !== activeType) return false;
-      // Hide ghost venues: Google returned null AND no OSM address
-      if (v.googleData === null && (!v.address || v.address.trim() === ""))
+      // Hide ghost venues: no Google address AND no OSM address
+      const noGoogleAddr =
+        v.googleData === null || (v.googleData && !v.googleData.address);
+      if (noGoogleAddr && (!v.address || v.address.trim() === ""))
         return false;
       return true;
     });
@@ -1158,9 +1158,10 @@ export default function App() {
         venueCacheRef.current[activeType] = updated;
         return updated;
       });
+      const noGoogleAddr =
+        googleData === null || (googleData && !googleData.address);
       const ghost =
-        googleData === null &&
-        (!venueAddress || venueAddress.trim() === "");
+        noGoogleAddr && (!venueAddress || venueAddress.trim() === "");
       if (ghost) {
         setSelectedVenue(null);
         showToast("Venue not found — removed from map");
