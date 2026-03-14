@@ -144,3 +144,12 @@ Currently all check-in state is lost on page refresh. Add persistence using `loc
 - Value: JSON array of `{ id, visitedAt, note, photo }`
 - On app load, merge saved visits into venue state
 - On check-in, update localStorage immediately
+
+
+### 1. Persistent Storage
+Currently all check-in state is lost on page refresh. Add persistence using `localStorage`:
+- Key: `cityquest_visited`
+- Value: JSON array of `{ id, visitedAt, note, photo }`
+- On app load, merge saved visits into venue state
+- On check-in, update localStorage immediately
+- Allow user to check in to the same venu multiple times, should display total times visited on card

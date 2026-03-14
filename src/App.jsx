@@ -333,7 +333,7 @@ function MapMoveDetector({ fetchCenter, onSearchArea }) {
         center.lat,
         center.lng,
       );
-      if (zoom >= 12 && dist > 1.5) {
+      if (zoom >= 12 && dist > 3) {
         onSearchArea({ lat: center.lat, lng: center.lng, zoom });
       } else {
         onSearchArea(null);
@@ -812,7 +812,7 @@ function BottomSheet({ sheetState, onStateChange, children, dragLabel }) {
       case "expanded":
         return 15;
       case "peek":
-        return 70;
+        return 80;
       case "collapsed":
         return 92;
       default:
@@ -853,8 +853,8 @@ function BottomSheet({ sheetState, onStateChange, children, dragLabel }) {
     );
     const currentY = match ? parseFloat(match[1]) : getTranslateY(sheetState);
     let target;
-    if (currentY < 42) target = "expanded";
-    else if (currentY < 82) target = "peek";
+    if (currentY < 48) target = "expanded";
+    else if (currentY < 86) target = "peek";
     else target = "collapsed";
     onStateChange(target);
     sheetRef.current.style.transform = `translateY(${getTranslateY(target)}%)`;
@@ -1321,7 +1321,7 @@ export default function App() {
             }}
             style={{
               flex: 1,
-              padding: "10px 4px",
+              padding: isDesktop ? "10px 4px" : "6px 4px",
               background:
                 activeType === t.id ? "rgba(255,255,255,0.06)" : "transparent",
               border: "none",
@@ -1342,7 +1342,7 @@ export default function App() {
               gap: 2,
             }}
           >
-            <span style={{ fontSize: 18 }}>{t.emoji}</span>
+            <span style={{ fontSize: isDesktop ? 18 : 14 }}>{t.emoji}</span>
             {t.label}
           </button>
         ))}
@@ -1385,7 +1385,7 @@ export default function App() {
             onClick={() => setPanel(id)}
             style={{
               flex: 1,
-              padding: "8px",
+              padding: isDesktop ? "8px" : "5px",
               background:
                 panel === id ? "rgba(255,255,255,0.05)" : "transparent",
               border: "none",
@@ -1403,7 +1403,7 @@ export default function App() {
                 panel === id ? "2px solid #f59e0b" : "2px solid transparent",
             }}
           >
-            <span style={{ fontSize: 16 }}>{icon}</span>
+            <span style={{ fontSize: isDesktop ? 16 : 13 }}>{icon}</span>
             {label}
           </button>
         ))}
