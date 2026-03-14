@@ -76,6 +76,38 @@ function setApiCache(venueId, source, data) {
   } catch {}
 }
 
+// ─── GHOST VENUE DETECTION ──────────────────────────────────────────────────
+// A ghost venue has no OSM address AND Google returned null (no match).
+// filterGhostVenues parses the localStorage cache ONCE for the whole array.
+function filterGhostVenues(venues) {
+  let cache;
+  try {
+    cache = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
+  } catch {
+    return venues;
+  }
+  const now = Date.now();
+  return venues.filter((v) => {
+    // If venue already has googleData in memory, use that
+    if (v.googleData !== undefined) {
+      return !(
+        v.googleData === null &&
+        (!v.address || v.address.trim() === "")
+      );
+    }
+    // Otherwise check localStorage cache
+    const entry = cache[`google_${v.id}`];
+    if (entry && now - entry.ts < CACHE_TTL) {
+      if (
+        entry.data === null &&
+        (!v.address || v.address.trim() === "")
+      )
+        return false;
+    }
+    return true;
+  });
+}
+
 // ─── OVERPASS API (OpenStreetMap) ────────────────────────────────────────────
 function buildAddress(tags) {
   const num = tags["addr:housenumber"] || "";
@@ -980,7 +1012,13 @@ export default function App() {
 
   const visitedCount = venues.filter((v) => v.visited).length;
   const typeVenues = useMemo(() => {
-    const filtered = venues.filter((v) => v.type === activeType);
+    const filtered = venues.filter((v) => {
+      if (v.type !== activeType) return false;
+      // Hide ghost venues: Google returned null AND no OSM address
+      if (v.googleData === null && (!v.address || v.address.trim() === ""))
+        return false;
+      return true;
+    });
     if (!userLocation) return filtered;
     const { lat, lng } = userLocation;
     return filtered.sort(
@@ -1108,6 +1146,34 @@ export default function App() {
   }, [selectedVenue?.id]);
 
   // ── Fetch Google Place details on venue selection ──
+  // Ghost handling: if Google returns null AND venue has no OSM address,
+  // we still set googleData on the venue (so typeVenues can filter it out),
+  // then close the card and show a toast. No venue-array splicing needed.
+  const applyGoogleData = useCallback(
+    (venueId, venueAddress, googleData) => {
+      setVenues((prev) => {
+        const updated = prev.map((v) =>
+          v.id === venueId ? { ...v, googleData } : v,
+        );
+        venueCacheRef.current[activeType] = updated;
+        return updated;
+      });
+      const ghost =
+        googleData === null &&
+        (!venueAddress || venueAddress.trim() === "");
+      if (ghost) {
+        setSelectedVenue(null);
+        showToast("Venue not found — removed from map");
+      } else {
+        setSelectedVenue((prev) =>
+          prev && prev.id === venueId ? { ...prev, googleData } : prev,
+        );
+      }
+      setGoogleLoading(false);
+    },
+    [activeType],
+  );
+
   useEffect(() => {
     if (!selectedVenue || selectedVenue.googleData !== undefined) {
       setGoogleLoading(false);
@@ -1116,18 +1182,7 @@ export default function App() {
 
     const cached = getApiCache(selectedVenue.id, "google");
     if (cached !== undefined) {
-      const googleData = cached;
-      setVenues((prev) => {
-        const updated = prev.map((v) =>
-          v.id === selectedVenue.id ? { ...v, googleData } : v,
-        );
-        venueCacheRef.current[activeType] = updated;
-        return updated;
-      });
-      setSelectedVenue((prev) =>
-        prev && prev.id === selectedVenue.id ? { ...prev, googleData } : prev,
-      );
-      setGoogleLoading(false);
+      applyGoogleData(selectedVenue.id, selectedVenue.address, cached);
       return;
     }
 
@@ -1143,17 +1198,7 @@ export default function App() {
         if (cancelled) return;
         const googleData = data || null;
         setApiCache(selectedVenue.id, "google", googleData);
-        setVenues((prev) => {
-          const updated = prev.map((v) =>
-            v.id === selectedVenue.id ? { ...v, googleData } : v,
-          );
-          venueCacheRef.current[activeType] = updated;
-          return updated;
-        });
-        setSelectedVenue((prev) =>
-          prev && prev.id === selectedVenue.id ? { ...prev, googleData } : prev,
-        );
-        setGoogleLoading(false);
+        applyGoogleData(selectedVenue.id, selectedVenue.address, googleData);
       })
       .catch(() => {
         if (!cancelled) setGoogleLoading(false);
@@ -1183,7 +1228,7 @@ export default function App() {
         map.set(v.id, v);
       }
     }
-    return Array.from(map.values());
+    return filterGhostVenues(Array.from(map.values()));
   }, []);
 
   // ── Fetch venues for active type ──
@@ -1200,8 +1245,9 @@ export default function App() {
     setLoading(true);
     fetchVenues(fetchCenter.lat, fetchCenter.lng, activeType, controller.signal)
       .then((fetched) => {
-        venueCacheRef.current[activeType] = fetched;
-        setVenues(fetched);
+        const filtered = filterGhostVenues(fetched);
+        venueCacheRef.current[activeType] = filtered;
+        setVenues(filtered);
         setLoading(false);
       })
       .catch((err) => {

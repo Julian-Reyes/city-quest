@@ -97,6 +97,19 @@ Photos and reviews are commented out to save API costs. See `REIMPLEMENT_PHOTOS_
 - Helpers: `getApiCache(venueId, source)` / `setApiCache(venueId, source, data)` in App.jsx
 - `undefined` = cache miss, `null` = API returned no match (important distinction)
 
+### Ghost Venue Filtering
+OSM returns stale/extinct venues that don't correspond to real businesses. A venue is a **ghost** when Google returns `null` AND it has no OSM address (`address === " "`).
+
+**How it works:**
+- `filterGhostVenues(venues)` — batch filter used during OSM fetch and `mergeVenues`. Parses localStorage cache **once** for the whole array (not per-venue, which caused crashes).
+- `typeVenues` useMemo — checks `v.googleData === null && no address` in-memory (fast, no localStorage). Hides ghosts from both map and list instantly.
+- Google Places useEffect — when a ghost is detected (fresh API call or cache hit), sets `googleData: null` on the venue, closes the venue card, and shows a toast.
+- Ghost venues are never visible but stay in the raw `venues` array until the next OSM fetch filters them out.
+
+**Flow:**
+1. First tap on ghost → Google API called, returns null → venue card closes with toast, ghost hidden in `typeVenues`
+2. Reload / revisit area → `filterGhostVenues` reads cache and strips ghost before it enters state
+
 ### Env Setup (local dev)
 - `.env` lives in `../secret/` (sibling directory to repo) — keeps keys out of git
 - `vite.config.js` uses `envDir: process.env.CI ? "." : "../secret"` — reads from repo root in CI, sibling folder locally
@@ -151,12 +164,4 @@ Currently all check-in state is lost on page refresh. Add persistence using `loc
 - Value: JSON array of `{ id, visitedAt, note, photo }`
 - On app load, merge saved visits into venue state
 - On check-in, update localStorage immediately
-
-
-### 1. Persistent Storage
-Currently all check-in state is lost on page refresh. Add persistence using `localStorage`:
-- Key: `cityquest_visited`
-- Value: JSON array of `{ id, visitedAt, note, photo }`
-- On app load, merge saved visits into venue state
-- On check-in, update localStorage immediately
-- Allow user to check in to the same venu multiple times, should display total times visited on card
+- Allow user to check in to the same venue multiple times; display total times visited on card

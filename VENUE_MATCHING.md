@@ -155,9 +155,14 @@ Already implemented in `fetchGooglePlaceDetails`:
 - Address-only gating at 300m (rating/hours/price still returned regardless)
 - `locationBias` with 500m radius (NOT `locationRestriction` — that broke things at 200m)
 
+Already implemented — ghost venue filtering (Option A Phase 1):
+- `filterGhostVenues(venues)` in `src/App.jsx` — batch filter that parses the localStorage cache once per array (not per venue). Called during OSM fetch and `mergeVenues`.
+- Ghost check in `typeVenues` useMemo — reads in-memory `v.googleData` (no localStorage hit) so both map and list instantly hide ghosts when they're identified.
+- Google Places useEffect — when a ghost is detected (fresh fetch or cache hit), sets `googleData: null` on the venue, closes the venue card, and shows a toast.
+- Definition: ghost = `googleData === null` AND `address === " "` (no OSM address tags)
+
 NOT yet implemented:
 - `osmTags` preservation on venue objects
 - Richer `textQuery` with address context
 - Name similarity validation (`places.displayName`)
 - ~~Any caching (IndexedDB or Cloudflare KV)~~ → Client-side localStorage cache implemented (7-day TTL). Cloudflare KV (Phase 3) NOT yet done.
-- Stale venue filtering/hiding

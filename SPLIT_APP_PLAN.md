@@ -1,7 +1,9 @@
 # Plan: Split App.jsx into Modules
 
 ## Context
-`src/App.jsx` is 1938 lines — a single-file React app containing all constants, API functions, components, hooks, utilities, and the main App component. It's becoming hard to navigate and maintain. Time to split into logical modules while keeping the same behavior.
+`src/App.jsx` is ~2000 lines — a single-file React app containing all constants, API functions, components, hooks, utilities, and the main App component. It's becoming hard to navigate and maintain. Time to split into logical modules while keeping the same behavior.
+
+> Note: Line numbers in this plan are approximate. The file grows with each feature added.
 
 ## File Structure
 
@@ -58,11 +60,12 @@ src/
 - `useIsDesktop()` — media query hook (≥768px)
 - Named export
 
-### `api/cache.js` (lines 58–77)
+### `api/cache.js` (lines 58–77 approx.)
 - `CACHE_KEY = "cityquest_api_cache"`
 - `CACHE_TTL = 7 * 24 * 60 * 60 * 1000`
 - `getApiCache(venueId, source)` — retrieves cached data, respects TTL
 - `setApiCache(venueId, source, data)` — stores data with timestamp
+- `filterGhostVenues(venues)` — batch ghost filter; parses cache once, uses CACHE_KEY/CACHE_TTL
 - Named exports
 
 ### `api/overpass.js` (lines 79–122)
