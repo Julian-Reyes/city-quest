@@ -11,7 +11,7 @@ import "leaflet/dist/leaflet.css";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const VENUE_TYPES = [
-  { id: "bar", label: "Bars", emoji: "🍺", color: "#f59e0b" },
+  { id: "bar", label: "Bar", emoji: "🍺", color: "#f59e0b" },
   { id: "cafe", label: "Coffee", emoji: "☕", color: "#92400e" },
   { id: "ice_cream", label: "Ice Cream", emoji: "🍦", color: "#ec4899" },
   { id: "restaurant", label: "Food", emoji: "🍔", color: "#10b981" },
@@ -99,8 +99,7 @@ function filterGhostVenues(venues) {
     if (entry && now - entry.ts < CACHE_TTL) {
       const noGoogleAddr =
         entry.data === null || (entry.data && !entry.data.address);
-      if (noGoogleAddr && (!v.address || v.address.trim() === ""))
-        return false;
+      if (noGoogleAddr && (!v.address || v.address.trim() === "")) return false;
     }
     return true;
   });
@@ -1015,8 +1014,7 @@ export default function App() {
       // Hide ghost venues: no Google address AND no OSM address
       const noGoogleAddr =
         v.googleData === null || (v.googleData && !v.googleData.address);
-      if (noGoogleAddr && (!v.address || v.address.trim() === ""))
-        return false;
+      if (noGoogleAddr && (!v.address || v.address.trim() === "")) return false;
       return true;
     });
     if (!userLocation) return filtered;
