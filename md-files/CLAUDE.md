@@ -10,8 +10,8 @@ A mobile-first PWA that gamifies exploring your city. Users discover bars, coffe
 
 ## What's Already Built
 
-### File: `src/App.jsx`
-A single-file React app (Vite project) with the following working:
+The app was originally a single-file `App.jsx` (~2000 lines) and has been split into modules.
+See **File Structure** below for the full layout. Features:
 
 **UI & Navigation**
 - Header with venue type name, visited count, and completion percentage
@@ -66,6 +66,35 @@ A single-file React app (Vite project) with the following working:
 
 ---
 
+## File Structure
+
+```
+src/
+├── App.jsx                      — Main orchestration: all state, effects, JSX layout
+├── constants.js                 — VENUE_TYPES (type switcher), ACHIEVEMENTS (gamification)
+├── api/
+│   ├── cache.js                 — localStorage cache (7-day TTL) + ghost venue filter
+│   ├── overpass.js              — OpenStreetMap venue fetching (free, no key)
+│   ├── foursquare.js            — Foursquare categories (proxied via Cloudflare Worker)
+│   └── google.js                — Google Places ratings, hours, price (direct in prod)
+├── components/
+│   ├── MapView.jsx              — Leaflet map, venue pins, user dot, pan detection
+│   ├── VenueCard.jsx            — Venue detail card (shared mobile overlay + desktop sidebar)
+│   ├── ListPanel.jsx            — Scrollable venue list with distance
+│   ├── AchievementsPanel.jsx    — Achievement milestones display
+│   └── BottomSheet.jsx          — Draggable bottom sheet (mobile only)
+├── hooks/
+│   └── useIsDesktop.js          — Responsive breakpoint hook (≥768px)
+└── utils/
+    └── distance.js              — Haversine distance calculation
+```
+
+**Key principle:** State-dependent logic (effects, handlers, mergeVenues) stays in App.jsx.
+Pure functions, API calls, and self-contained UI components are in their own modules.
+All files use named exports; only App uses a default export.
+
+---
+
 ## Architecture
 
 ### APIs
@@ -76,14 +105,14 @@ A single-file React app (Vite project) with the following working:
    - Direct browser calls in production (CORS supported)
    - API key in GitHub repo secret `VITE_GOOGLE_PLACES_KEY`
    - HTTP referrer restrictions: `julian-reyes.github.io/*`, `julianreyes.dev/*`, `localhost:5174/*`
-   - `GOOGLE_BASE` constant switches between `/api/google` (dev proxy) and `https://places.googleapis.com` (prod direct)
+   - `GOOGLE_BASE` constant in `src/api/google.js` switches between `/api/google` (dev proxy) and `https://places.googleapis.com` (prod direct)
 
 3. **Foursquare Places API** — Provides human-readable venue categories.
    - Proxied via Cloudflare Worker in production (Foursquare blocks CORS)
    - Worker URL: `https://fsq-proxy.city-quest.workers.dev`
    - Worker source: `workers/fsq-proxy/worker.js`
    - API key stored as Cloudflare secret `FSQ_API_KEY` (NOT in GitHub secrets — worker handles auth)
-   - `FSQ_BASE` constant switches between `/api/fsq` (dev proxy) and the worker URL (prod)
+   - `FSQ_BASE` constant in `src/api/foursquare.js` switches between `/api/fsq` (dev proxy) and the worker URL (prod)
    - Redeploy worker: `cd workers/fsq-proxy && wrangler deploy`
    - Allowed origins: `julian-reyes.github.io`, `julianreyes.dev`, `localhost:5174`, `localhost:5173`
 
@@ -94,16 +123,16 @@ Photos and reviews are commented out to save API costs. See `REIMPLEMENT_PHOTOS_
 - Google + Foursquare API responses cached in localStorage under key `cityquest_api_cache`
 - 7-day TTL — entries auto-expire and re-fetch from API
 - `null` results cached too (prevents re-fetching venues that don't exist in Google/Foursquare)
-- Helpers: `getApiCache(venueId, source)` / `setApiCache(venueId, source, data)` in App.jsx
+- Helpers: `getApiCache(venueId, source)` / `setApiCache(venueId, source, data)` in `src/api/cache.js`
 - `undefined` = cache miss, `null` = API returned no match (important distinction)
 
 ### Ghost Venue Filtering
 OSM returns stale/extinct venues that don't correspond to real businesses. A venue is a **ghost** when Google returns `null` AND it has no OSM address (`address === " "`).
 
 **How it works:**
-- `filterGhostVenues(venues)` — batch filter used during OSM fetch and `mergeVenues`. Parses localStorage cache **once** for the whole array (not per-venue, which caused crashes).
-- `typeVenues` useMemo — checks `v.googleData === null && no address` in-memory (fast, no localStorage). Hides ghosts from both map and list instantly.
-- Google Places useEffect — when a ghost is detected (fresh API call or cache hit), sets `googleData: null` on the venue, closes the venue card, and shows a toast.
+- `filterGhostVenues(venues)` in `src/api/cache.js` — batch filter used during OSM fetch and `mergeVenues`. Parses localStorage cache **once** for the whole array (not per-venue, which caused crashes).
+- `typeVenues` useMemo in `App.jsx` — checks `v.googleData === null && no address` in-memory (fast, no localStorage). Hides ghosts from both map and list instantly.
+- Google Places useEffect in `App.jsx` — when a ghost is detected (fresh API call or cache hit), sets `googleData: null` on the venue, closes the venue card, and shows a toast.
 - Ghost venues are never visible but stay in the raw `venues` array until the next OSM fetch filters them out.
 
 **Flow:**
@@ -151,17 +180,40 @@ OSM returns stale/extinct venues that don't correspond to real businesses. A ven
 ---
 
 ## Project Files
+- `src/` — App source code (see File Structure above)
 - `REIMPLEMENT_PHOTOS_REVIEWS.md` — Guide to re-enable photos and reviews (with cost breakdown)
 - `SCALING_PLAN.md` — Future scaling plan: freemium model, caching, cost projections
+- `SPLIT_APP_PLAN.md` — Original plan for splitting App.jsx into modules (completed)
 - `workers/fsq-proxy/` — Cloudflare Worker source for Foursquare proxy
 - `.env.example` — Template for required env vars
 
 
 ## TO DO
-### 1. Persistent Storage
-Currently all check-in state is lost on page refresh. Add persistence using `localStorage`:
-- Key: `cityquest_visited`
-- Value: JSON array of `{ id, visitedAt, note, photo }`
-- On app load, merge saved visits into venue state
-- On check-in, update localStorage immediately
-- Allow user to check in to the same venue multiple times; display total times visited on card
+
+### 1. Persistent Storage (planned, not yet implemented)
+Check-in data is lost on page refresh. Plan: persist visits to localStorage.
+
+**New files:**
+- `src/api/visits.js` — persistence helpers (getVisits, addVisit, saveVisitPhoto, getVisitPhoto)
+- `src/utils/photo.js` — canvas-based photo compression before storage (800px max, JPEG 0.7)
+
+**Data model** — localStorage key `cityquest_visited`:
+```json
+{
+  "osm-12345678": {
+    "visits": [
+      { "at": "2026-03-15T10:30:00Z", "note": "Great beer", "hasPhoto": true }
+    ]
+  }
+}
+```
+Photos stored in separate localStorage keys (`cityquest_photo_{venueId}_{index}`) to avoid blowing the 5MB limit.
+
+**Changes to existing files:**
+- `src/api/overpass.js` — add `visitCount: 0, visits: [], latestVisit: null` to default venue shape
+- `src/App.jsx` — add `visitsRef` (parsed once on mount), `hydrateVisits()` helper, modify `mergeVenues` / fetch effect / `handleCheckin` to read/write persisted visits. Fix existing bug: `handleCheckin` must update `venueCacheRef` (check-ins lost on tab switch). Track `totalVisited` state across all types for achievements.
+- `src/components/VenueCard.jsx` — show visit count ("Visited 3x"), "Check In Again" button for repeat visits, display latest note
+
+**Load flow:** `visitsRef` reads localStorage synchronously on mount → fetch effect calls `hydrateVisits()` after ghost filter → venues render with correct visited state
+
+Full plan: `.claude/plans/velvet-swinging-quilt.md`
