@@ -39,6 +39,7 @@ import { VenueCard } from "./components/VenueCard";
 import { ListPanel } from "./components/ListPanel";
 import { AchievementsPanel } from "./components/AchievementsPanel";
 import { BottomSheet } from "./components/BottomSheet";
+import { CameraOverlay } from "./components/CameraOverlay";
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
@@ -56,6 +57,7 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [achievementQueue, setAchievementQueue] = useState([]);
   const [searchArea, setSearchArea] = useState(null); // {lat, lng} when user pans far enough
+  const [showCamera, setShowCamera] = useState(false);
 
   const [fsqLoading, setFsqLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -859,6 +861,7 @@ export default function App() {
 
       {/* ── CHECK-IN MODAL ── */}
       {checkinModal && selectedVenue && (
+        <>
         <div
           style={{
             position: "fixed",
@@ -933,35 +936,53 @@ export default function App() {
               />
             </div>
 
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                width: "100%",
-                padding: 12,
-                marginBottom: 10,
-                background: "rgba(255,255,255,0.05)",
-                border: "1px dashed rgba(255,255,255,0.2)",
-                borderRadius: 10,
-                color: "rgba(255,255,255,0.5)",
-                fontFamily: "inherit",
-                fontSize: 13,
-                cursor: "pointer",
-              }}
-            >
-              📸 {photo ? "Change Photo" : "Add Photo (optional)"}
-            </button>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <button
+                onClick={() => setShowCamera(true)}
+                style={{
+                  flex: 1,
+                  padding: 12,
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px dashed rgba(255,255,255,0.2)",
+                  borderRadius: 10,
+                  color: "rgba(255,255,255,0.5)",
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                📷 {photo ? "Retake" : "Take Photo"}
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  flex: 1,
+                  padding: 12,
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px dashed rgba(255,255,255,0.2)",
+                  borderRadius: 10,
+                  color: "rgba(255,255,255,0.5)",
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                🖼 {photo ? "Change" : "Library"}
+              </button>
+            </div>
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              capture="environment"
               style={{ display: "none" }}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 const reader = new FileReader();
                 reader.onload = () => setPhoto(reader.result);
+                reader.onerror = () => showToast("Failed to read photo");
                 reader.readAsDataURL(file);
+                e.target.value = "";
               }}
             />
             {photo && (
@@ -1021,6 +1042,14 @@ export default function App() {
             </button>
           </div>
         </div>
+        {showCamera && (
+          <CameraOverlay
+            onCapture={(base64) => setPhoto(base64)}
+            onClose={() => setShowCamera(false)}
+            showToast={showToast}
+          />
+        )}
+        </>
       )}
 
       {/* ── ACHIEVEMENT UNLOCK (queue: tap advances to next) ── */}
