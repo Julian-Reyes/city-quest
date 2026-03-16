@@ -32,7 +32,7 @@ export function CameraOverlay({ onCapture, onClose, showToast }) {
       })
       .catch(() => {
         if (!cancelled) {
-          showToast("Camera access denied");
+          showToast("Camera access denied — enable in Settings for your browser");
           onClose();
         }
       });

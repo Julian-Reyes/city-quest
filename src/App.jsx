@@ -27,7 +27,7 @@ import { getApiCache, setApiCache, filterGhostVenues } from "./api/cache";
 import { fetchVenues } from "./api/overpass";
 import { fetchFoursquareDetails } from "./api/foursquare";
 import { fetchGooglePlaceDetails } from "./api/google";
-import { getVisits, addVisit, getVisitPhoto, getVisitStats, backfillVisitTypes } from "./api/visits";
+import { getVisits, addVisit, getVisitPhoto, getVisitStats, getVisitedVenues, backfillVisitTypes } from "./api/visits";
 import { resizePhoto } from "./utils/photo";
 
 // ── Hooks ──
@@ -351,8 +351,13 @@ export default function App() {
           visitsRef.current = getVisits();
           setVisitStats(getVisitStats());
         }
-        venueCacheRef.current[activeType] = hydrated;
-        setVenues(hydrated);
+        // Inject visited venues from localStorage so they show even outside search area
+        const savedVisited = getVisitedVenues(activeType);
+        const withSaved = savedVisited.length
+          ? mergeVenues(savedVisited, hydrated)
+          : hydrated;
+        venueCacheRef.current[activeType] = withSaved;
+        setVenues(withSaved);
         setLoading(false);
       })
       .catch((err) => {
@@ -409,7 +414,11 @@ export default function App() {
     const statsBefore = getVisitStats();
 
     // Persist to localStorage
-    addVisit(selectedVenue.id, visit, savedPhoto, activeType);
+    addVisit(selectedVenue.id, visit, savedPhoto, activeType, {
+      name: selectedVenue.name,
+      lat: selectedVenue.lat,
+      lng: selectedVenue.lng,
+    });
     visitsRef.current = getVisits();
 
     setVenues((prev) => {

@@ -42,10 +42,11 @@ See **File Structure** below for the full layout. Features:
 - Shows name, address, category, price, rating, and hours (from APIs)
 - "Check In Here" button opens a modal with:
   - Optional text note
-  - Optional photo (wired to `<input capture="environment">` for camera)
+  - Optional photo via two side-by-side buttons: "Take Photo" (custom `getUserMedia` camera) and "Library" (file input for gallery). Labels change to "Retake" / "Change" when photo exists.
   - Confirm button that marks venue as visited with timestamp
 - Repeat check-ins: visited venues show visit count ("Visited 3x") and a "+ Again" button
 - `visitStats` state tracks stats across all types (drives achievements)
+- Previously visited venues always shown on map, even outside current search radius (venue lat/lng/name persisted in localStorage at check-in time)
 
 **Achievements Panel**
 - 11 achievements in three sections:
@@ -60,17 +61,19 @@ See **File Structure** below for the full layout. Features:
 **Persistence**
 - All check-in state saved to localStorage (survives page refresh)
 - Venue visits, notes, and photos persist across sessions
-- Visit data stored under `cityquest_visited` key (never expires — user content); each venue entry includes `type` for per-category stats
+- Visit data stored under `cityquest_visited` key (never expires — user content); each venue entry includes `type`, `name`, `lat`, `lng` for per-category stats and out-of-area display
 - Photos stored in separate keys (`cityquest_photo_{venueId}_{index}`) to avoid hitting 5MB limit
 - Photos compressed via canvas before storage (800px max, JPEG 0.7 quality → ~100-200KB)
 - `visitsRef` in App.jsx parsed once on mount, hydrated into venues after ghost filter
 - `getVisitStats()` in visits.js computes `{total, bar, cafe, ice_cream, restaurant, photos, notes}` from stored data
+- `getVisitedVenues(type)` in visits.js reconstructs full venue objects from saved visits for a given type — used to inject visited venues into the map regardless of search area
 - `backfillVisitTypes(venues)` in visits.js patches old localStorage entries that lack a `type` field using venue data; called after venue fetches to fix per-category undercounting
 
 **PWA Support**
 - Installable on iPhone/Android via vite-plugin-pwa
 - Service worker for offline caching
 - App manifest with theme color and icons
+- Custom `getUserMedia` camera overlay (`CameraOverlay.jsx`) bypasses iOS standalone PWA black screen bug with native `<input capture>`. Requires HTTPS or localhost (`navigator.mediaDevices` unavailable in insecure contexts). Graceful fallback: permission denied → toast with Settings guidance; insecure context → toast explaining HTTPS requirement.
 
 **Other**
 - Toast notifications on check-in
@@ -90,13 +93,14 @@ src/
 │   ├── overpass.js              — OpenStreetMap venue fetching (free, no key)
 │   ├── foursquare.js            — Foursquare categories (proxied via Cloudflare Worker)
 │   ├── google.js                — Google Places ratings, hours, price (direct in prod)
-│   └── visits.js                — Persistent check-in storage (getVisits, addVisit, backfillVisitTypes, photo helpers)
+│   └── visits.js                — Persistent check-in storage (getVisits, addVisit, getVisitedVenues, backfillVisitTypes, photo helpers)
 ├── components/
 │   ├── MapView.jsx              — Leaflet map, venue pins, user dot, pan detection
 │   ├── VenueCard.jsx            — Venue detail card (shared mobile overlay + desktop sidebar)
 │   ├── ListPanel.jsx            — Scrollable venue list with distance
 │   ├── AchievementsPanel.jsx    — Achievement milestones display
-│   └── BottomSheet.jsx          — Draggable bottom sheet (mobile only)
+│   ├── BottomSheet.jsx          — Draggable bottom sheet (mobile only)
+│   └── CameraOverlay.jsx       — Full-screen getUserMedia camera (iOS PWA fix)
 ├── hooks/
 │   └── useIsDesktop.js          — Responsive breakpoint hook (≥768px)
 └── utils/

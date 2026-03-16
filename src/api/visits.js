@@ -21,11 +21,16 @@ export function getVisits() {
   }
 }
 
-export function addVisit(venueId, visit, photoBase64, venueType) {
+export function addVisit(venueId, visit, photoBase64, venueType, venueInfo) {
   try {
     const data = getVisits();
     if (!data[venueId]) data[venueId] = { visits: [] };
     if (venueType) data[venueId].type = venueType;
+    if (venueInfo) {
+      data[venueId].name = venueInfo.name;
+      data[venueId].lat = venueInfo.lat;
+      data[venueId].lng = venueInfo.lng;
+    }
 
     const visitIndex = data[venueId].visits.length;
     let hasPhoto = false;
@@ -73,6 +78,34 @@ export function backfillVisitTypes(venues) {
     localStorage.setItem(VISITS_KEY, JSON.stringify(data));
   }
   return changed;
+}
+
+export function getVisitedVenues(type) {
+  const data = getVisits();
+  const venues = [];
+  for (const [id, entry] of Object.entries(data)) {
+    if (!entry.visits?.length || !entry.lat || entry.type !== type) continue;
+    const latest = entry.visits[entry.visits.length - 1];
+    const latestPhoto = latest.hasPhoto
+      ? getVisitPhoto(id, entry.visits.length - 1)
+      : null;
+    venues.push({
+      id,
+      name: entry.name || "Unknown venue",
+      type: entry.type,
+      lat: entry.lat,
+      lng: entry.lng,
+      address: "",
+      visited: true,
+      visitCount: entry.visits.length,
+      visits: entry.visits,
+      latestVisit: latest,
+      visitedAt: latest.at,
+      note: latest.note || "",
+      photo: latestPhoto,
+    });
+  }
+  return venues;
 }
 
 export function getVisitStats() {
