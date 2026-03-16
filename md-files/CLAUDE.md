@@ -44,6 +44,8 @@ See **File Structure** below for the full layout. Features:
   - Optional text note
   - Optional photo (wired to `<input capture="environment">` for camera)
   - Confirm button that marks venue as visited with timestamp
+- Repeat check-ins: visited venues show visit count ("Visited 3x") and a "+ Again" button
+- `totalVisited` state tracks unique visited venues across all types (drives achievements)
 
 **Achievements Panel**
 - 5 achievements based on total visit count (1, 5, 10, 20, 50)
@@ -53,6 +55,10 @@ See **File Structure** below for the full layout. Features:
 **Persistence**
 - All check-in state saved to localStorage (survives page refresh)
 - Venue visits, notes, and photos persist across sessions
+- Visit data stored under `cityquest_visited` key (never expires — user content)
+- Photos stored in separate keys (`cityquest_photo_{venueId}_{index}`) to avoid hitting 5MB limit
+- Photos compressed via canvas before storage (800px max, JPEG 0.7 quality → ~100-200KB)
+- `visitsRef` in App.jsx parsed once on mount, hydrated into venues after ghost filter
 
 **PWA Support**
 - Installable on iPhone/Android via vite-plugin-pwa
@@ -76,7 +82,8 @@ src/
 │   ├── cache.js                 — localStorage cache (7-day TTL) + ghost venue filter
 │   ├── overpass.js              — OpenStreetMap venue fetching (free, no key)
 │   ├── foursquare.js            — Foursquare categories (proxied via Cloudflare Worker)
-│   └── google.js                — Google Places ratings, hours, price (direct in prod)
+│   ├── google.js                — Google Places ratings, hours, price (direct in prod)
+│   └── visits.js                — Persistent check-in storage (getVisits, addVisit, photo helpers)
 ├── components/
 │   ├── MapView.jsx              — Leaflet map, venue pins, user dot, pan detection
 │   ├── VenueCard.jsx            — Venue detail card (shared mobile overlay + desktop sidebar)
@@ -86,7 +93,8 @@ src/
 ├── hooks/
 │   └── useIsDesktop.js          — Responsive breakpoint hook (≥768px)
 └── utils/
-    └── distance.js              — Haversine distance calculation
+    ├── distance.js              — Haversine distance calculation
+    └── photo.js                 — Canvas-based photo compression (800px max, JPEG 0.7)
 ```
 
 **Key principle:** State-dependent logic (effects, handlers, mergeVenues) stays in App.jsx.
@@ -190,30 +198,23 @@ OSM returns stale/extinct venues that don't correspond to real businesses. A ven
 
 ## TO DO
 
-### 1. Persistent Storage (planned, not yet implemented)
-Check-in data is lost on page refresh. Plan: persist visits to localStorage.
+### 1. Persistent Storage — DONE
+Check-ins persist to localStorage via `src/api/visits.js` and `src/utils/photo.js`. Venues hydrated from storage on mount, support repeat check-ins with visit count display. See **Persistence** section above for details.
 
-**New files:**
-- `src/api/visits.js` — persistence helpers (getVisits, addVisit, saveVisitPhoto, getVisitPhoto)
-- `src/utils/photo.js` — canvas-based photo compression before storage (800px max, JPEG 0.7)
+### 2. Gamification Ideas (not yet implemented)
 
-**Data model** — localStorage key `cityquest_visited`:
-```json
-{
-  "osm-12345678": {
-    "visits": [
-      { "at": "2026-03-15T10:30:00Z", "note": "Great beer", "hasPhoto": true }
-    ]
-  }
-}
-```
-Photos stored in separate localStorage keys (`cityquest_photo_{venueId}_{index}`) to avoid blowing the 5MB limit.
+**Streaks** — Track consecutive daily check-ins in localStorage (`lastCheckinDate`, `currentStreak`). Show 🔥 streak counter in header. Add achievements for 3/7/30-day streaks.
 
-**Changes to existing files:**
-- `src/api/overpass.js` — add `visitCount: 0, visits: [], latestVisit: null` to default venue shape
-- `src/App.jsx` — add `visitsRef` (parsed once on mount), `hydrateVisits()` helper, modify `mergeVenues` / fetch effect / `handleCheckin` to read/write persisted visits. Fix existing bug: `handleCheckin` must update `venueCacheRef` (check-ins lost on tab switch). Track `totalVisited` state across all types for achievements.
-- `src/components/VenueCard.jsx` — show visit count ("Visited 3x"), "Check In Again" button for repeat visits, display latest note
+**XP / Level System** — Replace raw visit count with XP points. Base XP per check-in + bonuses: photo (+5), note (+3), first visit of a type (+10), revisit (+2). Display player level (Explorer → Veteran → Legend) in header.
 
-**Load flow:** `visitsRef` reads localStorage synchronously on mount → fetch effect calls `hydrateVisits()` after ghost filter → venues render with correct visited state
+**Per-Category Achievements** — Category-specific milestones alongside global ones: Coffee Snob (10 cafes), Bar Fly (15 bars), Sweet Tooth (5 ice cream), Food Critic (15 restaurants).
 
-Full plan: `.claude/plans/velvet-swinging-quilt.md`
+**Time / Combo Badges** — One-off badges using existing visit timestamps: Night Owl (check in after midnight), Early Bird (before 9am), City Sampler (all 4 types in one day).
+
+**Neighborhood Completion** — Group venues by lat/lng grid tile. Show per-neighborhood progress in list view (e.g. "Downtown: 4/12").
+
+**Rarity Tiers** — Use Foursquare sub-categories to tag rare venues (Speakeasy, Jazz Bar, Roastery) as ⭐ rare — worth bonus XP or a special card badge.
+
+**Passport UI** — Replace achievements panel with a visual stamp-book. Each stamp = a completed milestone or category. More tactile than a progress list.
+
+**Photo / Note Achievements** — "Photographer" (10 photos), "Chronicler" (10 notes with text). `hasPhoto` and `note` already tracked per visit.

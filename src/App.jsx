@@ -27,6 +27,8 @@ import { getApiCache, setApiCache, filterGhostVenues } from "./api/cache";
 import { fetchVenues } from "./api/overpass";
 import { fetchFoursquareDetails } from "./api/foursquare";
 import { fetchGooglePlaceDetails } from "./api/google";
+import { getVisits, addVisit, getVisitPhoto } from "./api/visits";
+import { resizePhoto } from "./utils/photo";
 
 // ── Hooks ──
 import { useIsDesktop } from "./hooks/useIsDesktop";
@@ -59,8 +61,35 @@ export default function App() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const fileInputRef = useRef(null);
   const venueCacheRef = useRef({});
+  const visitsRef = useRef(getVisits());
+  const [totalVisited, setTotalVisited] = useState(
+    () => Object.keys(getVisits()).length,
+  );
 
-  const visitedCount = venues.filter((v) => v.visited).length;
+  // ── Hydrate venues with persisted visit data ──
+  const hydrateVisits = useCallback((venues) => {
+    const saved = visitsRef.current;
+    return venues.map((v) => {
+      const sv = saved[v.id];
+      if (!sv || sv.visits.length === 0) return v;
+      const latest = sv.visits[sv.visits.length - 1];
+      const latestPhoto = latest.hasPhoto
+        ? getVisitPhoto(v.id, sv.visits.length - 1)
+        : null;
+      return {
+        ...v,
+        visited: true,
+        visitCount: sv.visits.length,
+        visits: sv.visits,
+        latestVisit: latest,
+        visitedAt: latest.at,
+        note: latest.note || "",
+        photo: latestPhoto,
+      };
+    });
+  }, []);
+
+  const visitedCount = totalVisited;
   const typeVenues = useMemo(() => {
     const filtered = venues.filter((v) => {
       if (v.type !== activeType) return false;
@@ -264,17 +293,37 @@ export default function App() {
   // ── Merge helper: combine new venues with existing, preserving visited state ──
   const mergeVenues = useCallback((existing, fetched) => {
     const map = new Map(existing.map((v) => [v.id, v]));
+    const savedVisits = visitsRef.current;
     for (const v of fetched) {
       if (map.has(v.id)) {
         const old = map.get(v.id);
         map.set(v.id, {
           ...v,
           visited: old.visited,
+          visitCount: old.visitCount || 0,
+          visits: old.visits || [],
+          latestVisit: old.latestVisit || null,
           visitedAt: old.visitedAt,
           photo: old.photo,
           note: old.note,
           fsqData: old.fsqData,
           googleData: old.googleData,
+        });
+      } else if (savedVisits[v.id] && savedVisits[v.id].visits.length > 0) {
+        const sv = savedVisits[v.id];
+        const latest = sv.visits[sv.visits.length - 1];
+        const latestPhoto = latest.hasPhoto
+          ? getVisitPhoto(v.id, sv.visits.length - 1)
+          : null;
+        map.set(v.id, {
+          ...v,
+          visited: true,
+          visitCount: sv.visits.length,
+          visits: sv.visits,
+          latestVisit: latest,
+          visitedAt: latest.at,
+          note: latest.note || "",
+          photo: latestPhoto,
         });
       } else {
         map.set(v.id, v);
@@ -297,9 +346,9 @@ export default function App() {
     setLoading(true);
     fetchVenues(fetchCenter.lat, fetchCenter.lng, activeType, controller.signal)
       .then((fetched) => {
-        const filtered = filterGhostVenues(fetched);
-        venueCacheRef.current[activeType] = filtered;
-        setVenues(filtered);
+        const hydrated = hydrateVisits(filterGhostVenues(fetched));
+        venueCacheRef.current[activeType] = hydrated;
+        setVenues(hydrated);
         setLoading(false);
       })
       .catch((err) => {
@@ -335,27 +384,50 @@ export default function App() {
       });
   }, [searchArea, activeType, mergeVenues]);
 
-  const handleCheckin = useCallback(() => {
+  const handleCheckin = useCallback(async () => {
     if (!selectedVenue) return;
-    const prevVisited = venues.filter((v) => v.visited).length;
+    const wasAlreadyVisited = selectedVenue.visited;
 
-    setVenues((prev) =>
-      prev.map((v) =>
-        v.id === selectedVenue.id
-          ? {
-              ...v,
-              visited: true,
-              visitedAt: new Date().toISOString(),
-              note,
-              photo,
-            }
-          : v,
-      ),
-    );
+    const visit = { at: new Date().toISOString(), note, hasPhoto: false };
 
-    const newCount = prevVisited + 1;
-    const unlocked = ACHIEVEMENTS.find((a) => a.threshold === newCount);
-    if (unlocked) setNewAchievement(unlocked);
+    // Compress and persist photo separately
+    let savedPhoto = null;
+    if (photo) {
+      savedPhoto = await resizePhoto(photo);
+      visit.hasPhoto = true;
+    }
+
+    // Persist to localStorage
+    addVisit(selectedVenue.id, visit, savedPhoto);
+    visitsRef.current = getVisits();
+
+    setVenues((prev) => {
+      const updated = prev.map((v) => {
+        if (v.id !== selectedVenue.id) return v;
+        const newVisits = [...(v.visits || []), visit];
+        return {
+          ...v,
+          visited: true,
+          visitCount: newVisits.length,
+          visits: newVisits,
+          latestVisit: visit,
+          visitedAt: visit.at,
+          note,
+          photo: savedPhoto || v.photo,
+        };
+      });
+      // Fix: sync venueCacheRef so tab switching preserves check-ins
+      venueCacheRef.current[activeType] = updated;
+      return updated;
+    });
+
+    // Achievement: only trigger on first visit to a venue
+    if (!wasAlreadyVisited) {
+      const newTotal = Object.keys(visitsRef.current).length;
+      setTotalVisited(newTotal);
+      const unlocked = ACHIEVEMENTS.find((a) => a.threshold === newTotal);
+      if (unlocked) setNewAchievement(unlocked);
+    }
 
     setCheckinModal(false);
     setSelectedVenue(null);
@@ -363,7 +435,7 @@ export default function App() {
     setPhoto(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     showToast(`✅ Checked in to ${selectedVenue.name}!`);
-  }, [selectedVenue, venues, note, photo]);
+  }, [selectedVenue, note, photo, activeType]);
 
   const completionPct = typeVenues.length
     ? Math.round((typeVisited / typeVenues.length) * 100)

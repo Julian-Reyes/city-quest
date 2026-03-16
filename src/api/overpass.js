@@ -49,6 +49,9 @@ export async function fetchVenues(lat, lng, type, signal) {
       address: buildAddress(el.tags),
       visited: false,
       visitedAt: null,
+      visitCount: 0,
+      visits: [],
+      latestVisit: null,
       photo: null,
       note: "",
     }));

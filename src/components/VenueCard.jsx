@@ -143,8 +143,22 @@ export function VenueCard({ venue, onClose, onCheckin, style, detailsLoading }) 
           </div>
         )}
         {venue.visited && (
-          <div style={{ marginBottom: 14, fontSize: 12, color: "#22c55e" }}>
-            ✓ Visited {new Date(venue.visitedAt).toLocaleDateString()}
+          <div style={{ marginBottom: 6, fontSize: 12, color: "#22c55e" }}>
+            ✓ Visited {venue.visitCount || 1}x — last{" "}
+            {new Date(venue.visitedAt).toLocaleDateString()}
+          </div>
+        )}
+        {venue.latestVisit?.note && (
+          <div
+            style={{
+              fontSize: 12,
+              color: "rgba(255,255,255,0.45)",
+              fontStyle: "italic",
+              marginBottom: 10,
+              lineHeight: 1.4,
+            }}
+          >
+            &ldquo;{venue.latestVisit.note}&rdquo;
           </div>
         )}
         {venue.photo && (
@@ -181,19 +195,38 @@ export function VenueCard({ venue, onClose, onCheckin, style, detailsLoading }) 
             📍 Check In Here
           </button>
         ) : (
-          <div
-            style={{
-              padding: "10px 14px",
-              background: "rgba(34,197,94,0.12)",
-              border: "1px solid rgba(34,197,94,0.3)",
-              borderRadius: 10,
-              color: "#22c55e",
-              fontSize: 13,
-              fontWeight: 600,
-              textAlign: "center",
-            }}
-          >
-            ✓ Already conquered this one
+          <div style={{ display: "flex", gap: 8 }}>
+            <div
+              style={{
+                flex: 1,
+                padding: "10px 14px",
+                background: "rgba(34,197,94,0.12)",
+                border: "1px solid rgba(34,197,94,0.3)",
+                borderRadius: 10,
+                color: "#22c55e",
+                fontSize: 13,
+                fontWeight: 600,
+                textAlign: "center",
+              }}
+            >
+              ✓ Conquered
+            </div>
+            <button
+              onClick={onCheckin}
+              style={{
+                padding: "10px 14px",
+                background: "rgba(245,158,11,0.12)",
+                border: "1px solid rgba(245,158,11,0.3)",
+                borderRadius: 10,
+                color: "#f59e0b",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              + Again
+            </button>
           </div>
         )}
       </div>

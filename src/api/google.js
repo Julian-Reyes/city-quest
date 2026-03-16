@@ -95,6 +95,10 @@ export async function fetchGooglePlaceDetails(name, lat, lng) {
     //   review = place.reviews[0].text.text;
     // }
 
+    // Hole 2 fix: if Google's result is >300m from OSM coords, reject entirely.
+    // A far-away match is a different business — don't pollute with its data.
+    if (googleDist !== null && googleDist > 300) return null;
+
     return {
       // photo,
       rating: place.rating || null,
@@ -102,10 +106,7 @@ export async function fetchGooglePlaceDetails(name, lat, lng) {
       price: GOOGLE_PRICE_MAP[place.priceLevel] ?? null,
       hours,
       // review,
-      address:
-        googleDist !== null && googleDist <= 300
-          ? place.formattedAddress || null
-          : null,
+      address: place.formattedAddress || null,
     };
   } catch (err) {
     console.error("Google Places fetch error:", err);
