@@ -27,7 +27,15 @@ import { getApiCache, setApiCache, filterGhostVenues } from "./api/cache";
 import { fetchVenues } from "./api/overpass";
 import { fetchFoursquareDetails } from "./api/foursquare";
 import { fetchGooglePlaceDetails } from "./api/google";
-import { getVisits, addVisit, getVisitPhoto, getVisitStats, getVisitedVenues, backfillVisitTypes } from "./api/visits";
+import {
+  getVisits,
+  addVisit,
+  getVisitPhoto,
+  getVisitStats,
+  getVisitedVenues,
+  getAllVisitedVenues,
+  backfillVisitTypes,
+} from "./api/visits";
 import { resizePhoto } from "./utils/photo";
 
 // ── Hooks ──
@@ -38,6 +46,7 @@ import { MapView } from "./components/MapView";
 import { VenueCard } from "./components/VenueCard";
 import { ListPanel } from "./components/ListPanel";
 import { AchievementsPanel } from "./components/AchievementsPanel";
+import { PassportPanel } from "./components/PassportPanel";
 import { BottomSheet } from "./components/BottomSheet";
 import { CameraOverlay } from "./components/CameraOverlay";
 
@@ -48,7 +57,7 @@ export default function App() {
   const [venues, setVenues] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
   const [selectedVenue, setSelectedVenue] = useState(null);
-  const [panel, setPanel] = useState("list"); // list | achievements
+  const [panel, setPanel] = useState("list"); // list | achievements | passport
   const [sheetState, setSheetState] = useState("peek"); // mobile: peek | expanded | collapsed
   const [loading, setLoading] = useState(true);
   const [checkinModal, setCheckinModal] = useState(false);
@@ -109,6 +118,11 @@ export default function App() {
     );
   }, [venues, activeType, userLocation]);
   const typeVisited = typeVenues.filter((v) => v.visited).length;
+
+  const passportVenues = useMemo(() => {
+    if (panel !== "passport") return [];
+    return getAllVisitedVenues();
+  }, [panel, visitStats]);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -230,7 +244,7 @@ export default function App() {
   // we still set googleData on the venue (so typeVenues can filter it out),
   // then close the card and show a toast. No venue-array splicing needed.
   const applyGoogleData = useCallback(
-    (venueId, venueAddress, googleData) => {
+    (venueId, venueAddress, googleData, isVisited) => {
       setVenues((prev) => {
         const updated = prev.map((v) =>
           v.id === venueId ? { ...v, googleData } : v,
@@ -241,7 +255,9 @@ export default function App() {
       const noGoogleAddr =
         googleData === null || (googleData && !googleData.address);
       const ghost =
-        noGoogleAddr && (!venueAddress || venueAddress.trim() === "");
+        !isVisited &&
+        noGoogleAddr &&
+        (!venueAddress || venueAddress.trim() === "");
       if (ghost) {
         setSelectedVenue(null);
         showToast("Venue not found — removed from map");
@@ -263,7 +279,12 @@ export default function App() {
 
     const cached = getApiCache(selectedVenue.id, "google");
     if (cached !== undefined) {
-      applyGoogleData(selectedVenue.id, selectedVenue.address, cached);
+      applyGoogleData(
+        selectedVenue.id,
+        selectedVenue.address,
+        cached,
+        selectedVenue.visited,
+      );
       return;
     }
 
@@ -279,7 +300,12 @@ export default function App() {
         if (cancelled) return;
         const googleData = data || null;
         setApiCache(selectedVenue.id, "google", googleData);
-        applyGoogleData(selectedVenue.id, selectedVenue.address, googleData);
+        applyGoogleData(
+          selectedVenue.id,
+          selectedVenue.address,
+          googleData,
+          selectedVenue.visited,
+        );
       })
       .catch(() => {
         if (!cancelled) setGoogleLoading(false);
@@ -445,7 +471,8 @@ export default function App() {
     const statsAfter = getVisitStats();
     setVisitStats(statsAfter);
     const unlocked = ACHIEVEMENTS.filter(
-      (a) => statsBefore[a.stat] < a.threshold && statsAfter[a.stat] >= a.threshold,
+      (a) =>
+        statsBefore[a.stat] < a.threshold && statsAfter[a.stat] >= a.threshold,
     );
     if (unlocked.length > 0) setAchievementQueue(unlocked);
 
@@ -645,6 +672,7 @@ export default function App() {
         {[
           ["list", "📋", "List", 0],
           ["achievements", "🏆", "Awards", 3],
+          ["passport", "🛂", "Passport", 0],
         ].map(([id, icon, label, iconPadTop]) => (
           <button
             key={id}
@@ -733,7 +761,11 @@ export default function App() {
             </div>
           ) : (
             <MapView
-              venues={typeVenues}
+              venues={
+                panel === "passport"
+                  ? passportVenues.filter((v) => v.lat)
+                  : typeVenues
+              }
               userLocation={userLocation}
               selectedVenue={selectedVenue}
               fetchCenter={fetchCenter}
@@ -748,7 +780,7 @@ export default function App() {
           )}
 
           {/* SEARCH THIS AREA BUTTON */}
-          {searchArea && !loading && (
+          {searchArea && !loading && panel !== "passport" && (
             <button
               onClick={handleSearchArea}
               style={{
@@ -805,11 +837,13 @@ export default function App() {
           <BottomSheet
             sheetState={sheetState}
             onStateChange={setSheetState}
-            peekPercent={panel === "achievements" ? 63 : 80}
+            peekPercent={panel === "list" ? 80 : 63}
             dragLabel={
               panel === "list"
                 ? `${typeVisited} of ${typeVenues.length} visited`
-                : null
+                : panel === "passport"
+                  ? `${passportVenues.length} venues stamped`
+                  : null
             }
           >
             {panel === "list" && (
@@ -818,6 +852,16 @@ export default function App() {
                 typeVisited={typeVisited}
                 userLocation={userLocation}
                 showHeader={false}
+                onVenueClick={(v) => {
+                  setSelectedVenue(v);
+                  setSheetState("collapsed");
+                }}
+              />
+            )}
+            {panel === "passport" && (
+              <PassportPanel
+                venues={passportVenues}
+                userLocation={userLocation}
                 onVenueClick={(v) => {
                   setSelectedVenue(v);
                   setSheetState("collapsed");
@@ -860,6 +904,13 @@ export default function App() {
                   onVenueClick={(v) => setSelectedVenue(v)}
                 />
               )}
+              {panel === "passport" && (
+                <PassportPanel
+                  venues={passportVenues}
+                  userLocation={userLocation}
+                  onVenueClick={(v) => setSelectedVenue(v)}
+                />
+              )}
               {panel === "achievements" && (
                 <AchievementsPanel stats={visitStats} />
               )}
@@ -871,193 +922,193 @@ export default function App() {
       {/* ── CHECK-IN MODAL ── */}
       {checkinModal && selectedVenue && (
         <>
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.85)",
-            zIndex: 999,
-            display: "flex",
-            alignItems: isDesktop ? "center" : "flex-end",
-            justifyContent: "center",
-            backdropFilter: "blur(4px)",
-          }}
-          onClick={(e) =>
-            e.target === e.currentTarget && setCheckinModal(false)
-          }
-        >
           <div
             style={{
-              width: isDesktop ? "100%" : "100%",
-              maxWidth: isDesktop ? 440 : undefined,
-              background: "#141420",
-              borderRadius: isDesktop ? 24 : "24px 24px 0 0",
-              padding: "24px 20px 40px",
-              animation: isDesktop ? "pop 0.25s ease" : "slideUp 0.3s ease",
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.85)",
+              zIndex: 999,
+              display: "flex",
+              alignItems: isDesktop ? "center" : "flex-end",
+              justifyContent: "center",
+              backdropFilter: "blur(4px)",
             }}
+            onClick={(e) =>
+              e.target === e.currentTarget && setCheckinModal(false)
+            }
           >
             <div
               style={{
-                width: 40,
-                height: 4,
-                background: "rgba(255,255,255,0.15)",
-                borderRadius: 2,
-                margin: "0 auto 20px",
-              }}
-            />
-            <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
-              Check In 📍
-            </div>
-            <div style={{ color: "#f59e0b", marginBottom: 20, fontSize: 14 }}>
-              {selectedVenue.name}
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  letterSpacing: 2,
-                  textTransform: "uppercase",
-                  color: "rgba(255,255,255,0.4)",
-                  marginBottom: 8,
-                }}
-              >
-                Add a note (optional)
-              </div>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Great craft beer selection..."
-                style={{
-                  width: "100%",
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 10,
-                  padding: 12,
-                  color: "#fff",
-                  fontSize: 14,
-                  fontFamily: "inherit",
-                  resize: "none",
-                  height: 80,
-                  boxSizing: "border-box",
-                  outline: "none",
-                }}
-              />
-            </div>
-
-            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-              <button
-                onClick={() => setShowCamera(true)}
-                style={{
-                  flex: 1,
-                  padding: 12,
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px dashed rgba(255,255,255,0.2)",
-                  borderRadius: 10,
-                  color: "rgba(255,255,255,0.5)",
-                  fontFamily: "inherit",
-                  fontSize: 13,
-                  cursor: "pointer",
-                }}
-              >
-                📷 {photo ? "Retake" : "Take Photo"}
-              </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                style={{
-                  flex: 1,
-                  padding: 12,
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px dashed rgba(255,255,255,0.2)",
-                  borderRadius: 10,
-                  color: "rgba(255,255,255,0.5)",
-                  fontFamily: "inherit",
-                  fontSize: 13,
-                  cursor: "pointer",
-                }}
-              >
-                🖼 {photo ? "Change" : "Library"}
-              </button>
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = () => setPhoto(reader.result);
-                reader.onerror = () => showToast("Failed to read photo");
-                reader.readAsDataURL(file);
-                e.target.value = "";
-              }}
-            />
-            {photo && (
-              <div style={{ position: "relative", marginBottom: 10 }}>
-                <img
-                  src={photo}
-                  alt=""
-                  style={{
-                    width: "100%",
-                    borderRadius: 10,
-                    maxHeight: 160,
-                    objectFit: "cover",
-                  }}
-                />
-                <button
-                  onClick={() => {
-                    setPhoto(null);
-                    if (fileInputRef.current) fileInputRef.current.value = "";
-                  }}
-                  style={{
-                    position: "absolute",
-                    top: 6,
-                    right: 6,
-                    background: "rgba(0,0,0,0.7)",
-                    border: "none",
-                    color: "#fff",
-                    width: 24,
-                    height: 24,
-                    borderRadius: "50%",
-                    cursor: "pointer",
-                    fontSize: 12,
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            )}
-
-            <button
-              onClick={handleCheckin}
-              style={{
-                width: "100%",
-                padding: 14,
-                background: "linear-gradient(135deg, #f59e0b, #d97706)",
-                border: "none",
-                borderRadius: 12,
-                color: "#000",
-                fontWeight: 700,
-                fontSize: 15,
-                letterSpacing: 1.5,
-                textTransform: "uppercase",
-                cursor: "pointer",
-                fontFamily: "inherit",
+                width: isDesktop ? "100%" : "100%",
+                maxWidth: isDesktop ? 440 : undefined,
+                background: "#141420",
+                borderRadius: isDesktop ? 24 : "24px 24px 0 0",
+                padding: "24px 20px 40px",
+                animation: isDesktop ? "pop 0.25s ease" : "slideUp 0.3s ease",
               }}
             >
-              ✓ Confirm Check-In
-            </button>
+              <div
+                style={{
+                  width: 40,
+                  height: 4,
+                  background: "rgba(255,255,255,0.15)",
+                  borderRadius: 2,
+                  margin: "0 auto 20px",
+                }}
+              />
+              <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
+                Check In 📍
+              </div>
+              <div style={{ color: "#f59e0b", marginBottom: 20, fontSize: 14 }}>
+                {selectedVenue.name}
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: 2,
+                    textTransform: "uppercase",
+                    color: "rgba(255,255,255,0.4)",
+                    marginBottom: 8,
+                  }}
+                >
+                  Add a note (optional)
+                </div>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Great craft beer selection..."
+                  style={{
+                    width: "100%",
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 10,
+                    padding: 12,
+                    color: "#fff",
+                    fontSize: 14,
+                    fontFamily: "inherit",
+                    resize: "none",
+                    height: 80,
+                    boxSizing: "border-box",
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <button
+                  onClick={() => setShowCamera(true)}
+                  style={{
+                    flex: 1,
+                    padding: 12,
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px dashed rgba(255,255,255,0.2)",
+                    borderRadius: 10,
+                    color: "rgba(255,255,255,0.5)",
+                    fontFamily: "inherit",
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  📷 {photo ? "Retake" : "Take Photo"}
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    flex: 1,
+                    padding: 12,
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px dashed rgba(255,255,255,0.2)",
+                    borderRadius: 10,
+                    color: "rgba(255,255,255,0.5)",
+                    fontFamily: "inherit",
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  🖼 {photo ? "Change" : "Library"}
+                </button>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => setPhoto(reader.result);
+                  reader.onerror = () => showToast("Failed to read photo");
+                  reader.readAsDataURL(file);
+                  e.target.value = "";
+                }}
+              />
+              {photo && (
+                <div style={{ position: "relative", marginBottom: 10 }}>
+                  <img
+                    src={photo}
+                    alt=""
+                    style={{
+                      width: "100%",
+                      borderRadius: 10,
+                      maxHeight: 160,
+                      objectFit: "cover",
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      setPhoto(null);
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
+                    style={{
+                      position: "absolute",
+                      top: 6,
+                      right: 6,
+                      background: "rgba(0,0,0,0.7)",
+                      border: "none",
+                      color: "#fff",
+                      width: 24,
+                      height: 24,
+                      borderRadius: "50%",
+                      cursor: "pointer",
+                      fontSize: 12,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={handleCheckin}
+                style={{
+                  width: "100%",
+                  padding: 14,
+                  background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                  border: "none",
+                  borderRadius: 12,
+                  color: "#000",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  letterSpacing: 1.5,
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                ✓ Confirm Check-In
+              </button>
+            </div>
           </div>
-        </div>
-        {showCamera && (
-          <CameraOverlay
-            onCapture={(base64) => setPhoto(base64)}
-            onClose={() => setShowCamera(false)}
-            showToast={showToast}
-          />
-        )}
+          {showCamera && (
+            <CameraOverlay
+              onCapture={(base64) => setPhoto(base64)}
+              onClose={() => setShowCamera(false)}
+              showToast={showToast}
+            />
+          )}
         </>
       )}
 
@@ -1110,7 +1161,10 @@ export default function App() {
                 letterSpacing: 2,
               }}
             >
-              TAP TO CONTINUE{achievementQueue.length > 1 ? ` (${achievementQueue.length - 1} more)` : ""}
+              TAP TO CONTINUE
+              {achievementQueue.length > 1
+                ? ` (${achievementQueue.length - 1} more)`
+                : ""}
             </div>
           </div>
         </div>

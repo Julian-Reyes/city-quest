@@ -69,8 +69,18 @@ export function backfillVisitTypes(venues) {
   let changed = false;
   for (const venue of venues) {
     const entry = data[venue.id];
-    if (entry && !entry.type && venue.type) {
+    if (!entry) continue;
+    if (!entry.type && venue.type) {
       entry.type = venue.type;
+      changed = true;
+    }
+    if (!entry.name && venue.name) {
+      entry.name = venue.name;
+      changed = true;
+    }
+    if (!entry.lat && venue.lat) {
+      entry.lat = venue.lat;
+      entry.lng = venue.lng;
       changed = true;
     }
   }
@@ -85,6 +95,34 @@ export function getVisitedVenues(type) {
   const venues = [];
   for (const [id, entry] of Object.entries(data)) {
     if (!entry.visits?.length || !entry.lat || entry.type !== type) continue;
+    const latest = entry.visits[entry.visits.length - 1];
+    const latestPhoto = latest.hasPhoto
+      ? getVisitPhoto(id, entry.visits.length - 1)
+      : null;
+    venues.push({
+      id,
+      name: entry.name || "Unknown venue",
+      type: entry.type,
+      lat: entry.lat,
+      lng: entry.lng,
+      address: "",
+      visited: true,
+      visitCount: entry.visits.length,
+      visits: entry.visits,
+      latestVisit: latest,
+      visitedAt: latest.at,
+      note: latest.note || "",
+      photo: latestPhoto,
+    });
+  }
+  return venues;
+}
+
+export function getAllVisitedVenues() {
+  const data = getVisits();
+  const venues = [];
+  for (const [id, entry] of Object.entries(data)) {
+    if (!entry.visits?.length) continue;
     const latest = entry.visits[entry.visits.length - 1];
     const latestPhoto = latest.hasPhoto
       ? getVisitPhoto(id, entry.visits.length - 1)

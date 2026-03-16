@@ -17,7 +17,7 @@ See **File Structure** below for the full layout. Features:
 - Header with venue type name, visited count, and completion percentage
 - Venue type switcher (Bars 🍺 / Coffee ☕ / Ice Cream 🍦 / Food 🍔)
 - Animated progress bar showing % of venues visited
-- Bottom nav with Map / List / Achievements tabs
+- Bottom nav with List / Awards / Passport tabs
 - Responsive layout: mobile (stacked) and desktop (two-column with sidebar)
 
 **Map View**
@@ -48,6 +48,18 @@ See **File Structure** below for the full layout. Features:
 - `visitStats` state tracks stats across all types (drives achievements)
 - Previously visited venues always shown on map, even outside current search radius (venue lat/lng/name persisted in localStorage at check-in time)
 
+**Passport Panel**
+- Visual stamp-book showing all visited venues across all types
+- Header card with total stamped count, type breakdown pills (emoji + count per type)
+- 2-column stamp grid grouped by type, sorted most-recent-first
+- Each stamp shows type emoji, venue name, visit date, visit count badge, and photo thumbnail if exists
+- When passport tab is active, map shows only visited pins (all types, no unvisited)
+- "Search this area" button hidden in passport mode
+- Tapping a stamp selects the venue on the map
+- Empty state when no venues visited
+- `getAllVisitedVenues()` in visits.js returns all visited venues without type filter (does not require lat/lng — stamps show even for old check-ins missing coordinates)
+- Visited venues skip ghost detection (never "removed from map")
+
 **Achievements Panel**
 - 11 achievements in three sections:
   - **Milestones** (global): First Sip (1), Night Owl (5), Bar Hopper (10), Local Legend (20), City Conqueror (50)
@@ -67,7 +79,8 @@ See **File Structure** below for the full layout. Features:
 - `visitsRef` in App.jsx parsed once on mount, hydrated into venues after ghost filter
 - `getVisitStats()` in visits.js computes `{total, bar, cafe, ice_cream, restaurant, photos, notes}` from stored data
 - `getVisitedVenues(type)` in visits.js reconstructs full venue objects from saved visits for a given type — used to inject visited venues into the map regardless of search area
-- `backfillVisitTypes(venues)` in visits.js patches old localStorage entries that lack a `type` field using venue data; called after venue fetches to fix per-category undercounting
+- `getAllVisitedVenues()` in visits.js returns all visited venues across all types (no lat/lng requirement) — used by Passport panel
+- `backfillVisitTypes(venues)` in visits.js patches old localStorage entries that lack `type`, `name`, or `lat`/`lng` fields using venue data; called after venue fetches to fix missing metadata
 
 **PWA Support**
 - Installable on iPhone/Android via vite-plugin-pwa
@@ -93,12 +106,13 @@ src/
 │   ├── overpass.js              — OpenStreetMap venue fetching (free, no key)
 │   ├── foursquare.js            — Foursquare categories (proxied via Cloudflare Worker)
 │   ├── google.js                — Google Places ratings, hours, price (direct in prod)
-│   └── visits.js                — Persistent check-in storage (getVisits, addVisit, getVisitedVenues, backfillVisitTypes, photo helpers)
+│   └── visits.js                — Persistent check-in storage (getVisits, addVisit, getVisitedVenues, getAllVisitedVenues, backfillVisitTypes, photo helpers)
 ├── components/
 │   ├── MapView.jsx              — Leaflet map, venue pins, user dot, pan detection
 │   ├── VenueCard.jsx            — Venue detail card (shared mobile overlay + desktop sidebar)
 │   ├── ListPanel.jsx            — Scrollable venue list with distance
 │   ├── AchievementsPanel.jsx    — Achievement milestones display
+│   ├── PassportPanel.jsx        — Stamp-book of all visited venues (cross-type)
 │   ├── BottomSheet.jsx          — Draggable bottom sheet (mobile only)
 │   └── CameraOverlay.jsx       — Full-screen getUserMedia camera (iOS PWA fix)
 ├── hooks/
@@ -231,4 +245,5 @@ Category-specific milestones (Bar Fly, Coffee Snob, Sweet Tooth, Food Critic) an
 
 **Rarity Tiers** — Use Foursquare sub-categories to tag rare venues (Speakeasy, Jazz Bar, Roastery) as ⭐ rare — worth bonus XP or a special card badge.
 
-**Passport UI** — Replace achievements panel with a visual stamp-book. Each stamp = a completed milestone or category. More tactile than a progress list.
+### 4. Passport UI — DONE
+Stamp-book panel showing all visited venues across all types. Grouped by type with 2-column stamp grid, type breakdown pills, and map mode showing only visited pins. See **Passport Panel** section above for details.
