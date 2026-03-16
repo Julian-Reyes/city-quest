@@ -12,7 +12,13 @@
  * Photos and reviews are commented out to save API costs.
  */
 
-export function VenueCard({ venue, onClose, onCheckin, style, detailsLoading }) {
+export function VenueCard({
+  venue,
+  onClose,
+  onCheckin,
+  style,
+  detailsLoading,
+}) {
   if (!venue) return null;
   const fsq = venue.fsqData;
   const goog = venue.googleData;
@@ -144,7 +150,7 @@ export function VenueCard({ venue, onClose, onCheckin, style, detailsLoading }) 
         )}
         {venue.visited && (
           <div style={{ marginBottom: 6, fontSize: 12, color: "#22c55e" }}>
-            ✓ Visited {venue.visitCount || 1}x — last{" "}
+            ✓ Visited {venue.visitCount || 1}x — last visit:{" "}
             {new Date(venue.visitedAt).toLocaleDateString()}
           </div>
         )}
@@ -225,7 +231,7 @@ export function VenueCard({ venue, onClose, onCheckin, style, detailsLoading }) 
                 fontFamily: "inherit",
               }}
             >
-              + Again
+              + Check-In
             </button>
           </div>
         )}

@@ -45,20 +45,27 @@ See **File Structure** below for the full layout. Features:
   - Optional photo (wired to `<input capture="environment">` for camera)
   - Confirm button that marks venue as visited with timestamp
 - Repeat check-ins: visited venues show visit count ("Visited 3x") and a "+ Again" button
-- `totalVisited` state tracks unique visited venues across all types (drives achievements)
+- `visitStats` state tracks stats across all types (drives achievements)
 
 **Achievements Panel**
-- 5 achievements based on total visit count (1, 5, 10, 20, 50)
-- Full-screen celebration animation when one is unlocked
-- Progress shown for locked achievements
+- 11 achievements in three sections:
+  - **Milestones** (global): First Sip (1), Night Owl (5), Bar Hopper (10), Local Legend (20), City Conqueror (50)
+  - **Categories** (per-type): Bar Fly (15 bars), Coffee Snob (10 cafes), Sweet Tooth (5 ice cream), Food Critic (15 restaurants)
+  - **Activity**: Photographer (10 photos), Chronicler (10 notes)
+- Each achievement has a `stat` key that maps to a field in the stats object (`total`, `bar`, `cafe`, `ice_cream`, `restaurant`, `photos`, `notes`)
+- Full-screen celebration animation when achievements are unlocked; multiple simultaneous unlocks queue and show sequentially (tap to advance)
+- Progress shown for locked achievements ("X more to go")
+- Unlock detection compares stats before/after check-in, so photo/note achievements trigger on repeat visits too
 
 **Persistence**
 - All check-in state saved to localStorage (survives page refresh)
 - Venue visits, notes, and photos persist across sessions
-- Visit data stored under `cityquest_visited` key (never expires — user content)
+- Visit data stored under `cityquest_visited` key (never expires — user content); each venue entry includes `type` for per-category stats
 - Photos stored in separate keys (`cityquest_photo_{venueId}_{index}`) to avoid hitting 5MB limit
 - Photos compressed via canvas before storage (800px max, JPEG 0.7 quality → ~100-200KB)
 - `visitsRef` in App.jsx parsed once on mount, hydrated into venues after ghost filter
+- `getVisitStats()` in visits.js computes `{total, bar, cafe, ice_cream, restaurant, photos, notes}` from stored data
+- `backfillVisitTypes(venues)` in visits.js patches old localStorage entries that lack a `type` field using venue data; called after venue fetches to fix per-category undercounting
 
 **PWA Support**
 - Installable on iPhone/Android via vite-plugin-pwa
@@ -83,7 +90,7 @@ src/
 │   ├── overpass.js              — OpenStreetMap venue fetching (free, no key)
 │   ├── foursquare.js            — Foursquare categories (proxied via Cloudflare Worker)
 │   ├── google.js                — Google Places ratings, hours, price (direct in prod)
-│   └── visits.js                — Persistent check-in storage (getVisits, addVisit, photo helpers)
+│   └── visits.js                — Persistent check-in storage (getVisits, addVisit, backfillVisitTypes, photo helpers)
 ├── components/
 │   ├── MapView.jsx              — Leaflet map, venue pins, user dot, pan detection
 │   ├── VenueCard.jsx            — Venue detail card (shared mobile overlay + desktop sidebar)
@@ -137,6 +144,8 @@ Photos and reviews are commented out to save API costs. See `REIMPLEMENT_PHOTOS_
 ### Ghost Venue Filtering
 OSM returns stale/extinct venues that don't correspond to real businesses. A venue is a **ghost** when Google returns `null` AND it has no OSM address (`address === " "`).
 
+**Distance gate (google.js):** If Google's best text match is >300m from the OSM coordinates, the entire result is rejected (returns `null`). This prevents showing rating/hours/price from a different business that happens to share a similar name. Previously only the address was nulled — now the full result is discarded.
+
 **How it works:**
 - `filterGhostVenues(venues)` in `src/api/cache.js` — batch filter used during OSM fetch and `mergeVenues`. Parses localStorage cache **once** for the whole array (not per-venue, which caused crashes).
 - `typeVenues` useMemo in `App.jsx` — checks `v.googleData === null && no address` in-memory (fast, no localStorage). Hides ghosts from both map and list instantly.
@@ -144,8 +153,10 @@ OSM returns stale/extinct venues that don't correspond to real businesses. A ven
 - Ghost venues are never visible but stay in the raw `venues` array until the next OSM fetch filters them out.
 
 **Flow:**
-1. First tap on ghost → Google API called, returns null → venue card closes with toast, ghost hidden in `typeVenues`
+1. First tap on ghost → Google API called, returns null (no match or >300m) → venue card closes with toast, ghost hidden in `typeVenues`
 2. Reload / revisit area → `filterGhostVenues` reads cache and strips ghost before it enters state
+
+**Remaining gap — name validation:** Google text search can match a different business with a similar name within 300m. `places.displayName` is not currently requested in the field mask, so there's no way to verify the name matches. Adding name validation would require requesting `displayName` and implementing fuzzy name comparison.
 
 ### Env Setup (local dev)
 - `.env` lives in `../secret/` (sibling directory to repo) — keeps keys out of git
@@ -201,13 +212,14 @@ OSM returns stale/extinct venues that don't correspond to real businesses. A ven
 ### 1. Persistent Storage — DONE
 Check-ins persist to localStorage via `src/api/visits.js` and `src/utils/photo.js`. Venues hydrated from storage on mount, support repeat check-ins with visit count display. See **Persistence** section above for details.
 
-### 2. Gamification Ideas (not yet implemented)
+### 2. Per-Category & Activity Achievements — DONE
+Category-specific milestones (Bar Fly, Coffee Snob, Sweet Tooth, Food Critic) and activity achievements (Photographer, Chronicler) implemented alongside global milestones. Achievements panel now renders in three sections. Visit data stores `venueType` for per-category counting. See **Achievements Panel** section above for full list.
+
+### 3. Gamification Ideas (not yet implemented)
 
 **Streaks** — Track consecutive daily check-ins in localStorage (`lastCheckinDate`, `currentStreak`). Show 🔥 streak counter in header. Add achievements for 3/7/30-day streaks.
 
 **XP / Level System** — Replace raw visit count with XP points. Base XP per check-in + bonuses: photo (+5), note (+3), first visit of a type (+10), revisit (+2). Display player level (Explorer → Veteran → Legend) in header.
-
-**Per-Category Achievements** — Category-specific milestones alongside global ones: Coffee Snob (10 cafes), Bar Fly (15 bars), Sweet Tooth (5 ice cream), Food Critic (15 restaurants).
 
 **Time / Combo Badges** — One-off badges using existing visit timestamps: Night Owl (check in after midnight), Early Bird (before 9am), City Sampler (all 4 types in one day).
 
@@ -216,5 +228,3 @@ Check-ins persist to localStorage via `src/api/visits.js` and `src/utils/photo.j
 **Rarity Tiers** — Use Foursquare sub-categories to tag rare venues (Speakeasy, Jazz Bar, Roastery) as ⭐ rare — worth bonus XP or a special card badge.
 
 **Passport UI** — Replace achievements panel with a visual stamp-book. Each stamp = a completed milestone or category. More tactile than a progress list.
-
-**Photo / Note Achievements** — "Photographer" (10 photos), "Chronicler" (10 notes with text). `hasPhoto` and `note` already tracked per visit.

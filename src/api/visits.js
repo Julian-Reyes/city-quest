@@ -21,10 +21,11 @@ export function getVisits() {
   }
 }
 
-export function addVisit(venueId, visit, photoBase64) {
+export function addVisit(venueId, visit, photoBase64, venueType) {
   try {
     const data = getVisits();
     if (!data[venueId]) data[venueId] = { visits: [] };
+    if (venueType) data[venueId].type = venueType;
 
     const visitIndex = data[venueId].visits.length;
     let hasPhoto = false;
@@ -56,4 +57,35 @@ export function getVisitPhoto(venueId, visitIndex) {
   } catch {
     return null;
   }
+}
+
+export function backfillVisitTypes(venues) {
+  const data = getVisits();
+  let changed = false;
+  for (const venue of venues) {
+    const entry = data[venue.id];
+    if (entry && !entry.type && venue.type) {
+      entry.type = venue.type;
+      changed = true;
+    }
+  }
+  if (changed) {
+    localStorage.setItem(VISITS_KEY, JSON.stringify(data));
+  }
+  return changed;
+}
+
+export function getVisitStats() {
+  const data = getVisits();
+  const stats = { total: 0, bar: 0, cafe: 0, ice_cream: 0, restaurant: 0, photos: 0, notes: 0 };
+  for (const entry of Object.values(data)) {
+    if (!entry.visits || entry.visits.length === 0) continue;
+    stats.total++;
+    if (entry.type && stats[entry.type] !== undefined) stats[entry.type]++;
+    for (const v of entry.visits) {
+      if (v.hasPhoto) stats.photos++;
+      if (v.note) stats.notes++;
+    }
+  }
+  return stats;
 }

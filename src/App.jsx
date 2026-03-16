@@ -27,7 +27,7 @@ import { getApiCache, setApiCache, filterGhostVenues } from "./api/cache";
 import { fetchVenues } from "./api/overpass";
 import { fetchFoursquareDetails } from "./api/foursquare";
 import { fetchGooglePlaceDetails } from "./api/google";
-import { getVisits, addVisit, getVisitPhoto } from "./api/visits";
+import { getVisits, addVisit, getVisitPhoto, getVisitStats, backfillVisitTypes } from "./api/visits";
 import { resizePhoto } from "./utils/photo";
 
 // ── Hooks ──
@@ -54,7 +54,7 @@ export default function App() {
   const [note, setNote] = useState("");
   const [photo, setPhoto] = useState(null);
   const [toast, setToast] = useState(null);
-  const [newAchievement, setNewAchievement] = useState(null);
+  const [achievementQueue, setAchievementQueue] = useState([]);
   const [searchArea, setSearchArea] = useState(null); // {lat, lng} when user pans far enough
 
   const [fsqLoading, setFsqLoading] = useState(false);
@@ -62,9 +62,7 @@ export default function App() {
   const fileInputRef = useRef(null);
   const venueCacheRef = useRef({});
   const visitsRef = useRef(getVisits());
-  const [totalVisited, setTotalVisited] = useState(
-    () => Object.keys(getVisits()).length,
-  );
+  const [visitStats, setVisitStats] = useState(() => getVisitStats());
 
   // ── Hydrate venues with persisted visit data ──
   const hydrateVisits = useCallback((venues) => {
@@ -89,7 +87,7 @@ export default function App() {
     });
   }, []);
 
-  const visitedCount = totalVisited;
+  const visitedCount = visitStats.total;
   const typeVenues = useMemo(() => {
     const filtered = venues.filter((v) => {
       if (v.type !== activeType) return false;
@@ -347,6 +345,10 @@ export default function App() {
     fetchVenues(fetchCenter.lat, fetchCenter.lng, activeType, controller.signal)
       .then((fetched) => {
         const hydrated = hydrateVisits(filterGhostVenues(fetched));
+        if (backfillVisitTypes(hydrated)) {
+          visitsRef.current = getVisits();
+          setVisitStats(getVisitStats());
+        }
         venueCacheRef.current[activeType] = hydrated;
         setVenues(hydrated);
         setLoading(false);
@@ -370,6 +372,10 @@ export default function App() {
     setFetchCenter(newCenter);
     fetchVenues(newCenter.lat, newCenter.lng, activeType, controller.signal)
       .then((fetched) => {
+        if (backfillVisitTypes(fetched)) {
+          visitsRef.current = getVisits();
+          setVisitStats(getVisitStats());
+        }
         setVenues((prev) => {
           const merged = mergeVenues(prev, fetched);
           venueCacheRef.current[activeType] = merged;
@@ -397,8 +403,11 @@ export default function App() {
       visit.hasPhoto = true;
     }
 
+    // Snapshot stats before persisting (for achievement comparison)
+    const statsBefore = getVisitStats();
+
     // Persist to localStorage
-    addVisit(selectedVenue.id, visit, savedPhoto);
+    addVisit(selectedVenue.id, visit, savedPhoto, activeType);
     visitsRef.current = getVisits();
 
     setVenues((prev) => {
@@ -421,13 +430,13 @@ export default function App() {
       return updated;
     });
 
-    // Achievement: only trigger on first visit to a venue
-    if (!wasAlreadyVisited) {
-      const newTotal = Object.keys(visitsRef.current).length;
-      setTotalVisited(newTotal);
-      const unlocked = ACHIEVEMENTS.find((a) => a.threshold === newTotal);
-      if (unlocked) setNewAchievement(unlocked);
-    }
+    // Achievement: compare stats before/after to detect newly crossed thresholds
+    const statsAfter = getVisitStats();
+    setVisitStats(statsAfter);
+    const unlocked = ACHIEVEMENTS.filter(
+      (a) => statsBefore[a.stat] < a.threshold && statsAfter[a.stat] >= a.threshold,
+    );
+    if (unlocked.length > 0) setAchievementQueue(unlocked);
 
     setCheckinModal(false);
     setSelectedVenue(null);
@@ -805,7 +814,7 @@ export default function App() {
               />
             )}
             {panel === "achievements" && (
-              <AchievementsPanel visitedCount={visitedCount} />
+              <AchievementsPanel stats={visitStats} />
             )}
           </BottomSheet>
         )}
@@ -841,7 +850,7 @@ export default function App() {
                 />
               )}
               {panel === "achievements" && (
-                <AchievementsPanel visitedCount={visitedCount} />
+                <AchievementsPanel stats={visitStats} />
               )}
             </div>
           </div>
@@ -1014,8 +1023,8 @@ export default function App() {
         </div>
       )}
 
-      {/* ── ACHIEVEMENT UNLOCK ── */}
-      {newAchievement && (
+      {/* ── ACHIEVEMENT UNLOCK (queue: tap advances to next) ── */}
+      {achievementQueue.length > 0 && (
         <div
           style={{
             position: "fixed",
@@ -1027,7 +1036,7 @@ export default function App() {
             justifyContent: "center",
             backdropFilter: "blur(8px)",
           }}
-          onClick={() => setNewAchievement(null)}
+          onClick={() => setAchievementQueue((q) => q.slice(1))}
         >
           <div
             style={{
@@ -1036,7 +1045,7 @@ export default function App() {
             }}
           >
             <div style={{ fontSize: 80, marginBottom: 16 }}>
-              {newAchievement.emoji}
+              {achievementQueue[0].emoji}
             </div>
             <div
               style={{
@@ -1050,10 +1059,10 @@ export default function App() {
               Achievement Unlocked
             </div>
             <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 8 }}>
-              {newAchievement.label}
+              {achievementQueue[0].label}
             </div>
             <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
-              {newAchievement.desc}
+              {achievementQueue[0].desc}
             </div>
             <div
               style={{
@@ -1063,7 +1072,7 @@ export default function App() {
                 letterSpacing: 2,
               }}
             >
-              TAP TO CONTINUE
+              TAP TO CONTINUE{achievementQueue.length > 1 ? ` (${achievementQueue.length - 1} more)` : ""}
             </div>
           </div>
         </div>
