@@ -95,8 +95,9 @@ export async function fetchGooglePlaceDetails(name, lat, lng) {
     //   review = place.reviews[0].text.text;
     // }
 
-    // Reject permanently closed businesses — treat as ghost
-    if (place.businessStatus === "CLOSED_PERMANENTLY") return null;
+    // Reject permanently closed businesses — always treat as ghost
+    if (place.businessStatus === "CLOSED_PERMANENTLY")
+      return { closed: true };
 
     // Hole 2 fix: if Google's result is >300m from OSM coords, reject entirely.
     // A far-away match is a different business — don't pollute with its data.
