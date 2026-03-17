@@ -161,18 +161,20 @@ Photos and reviews are commented out to save API costs. See `REIMPLEMENT_PHOTOS_
 - `undefined` = cache miss, `null` = API returned no match (important distinction)
 
 ### Ghost Venue Filtering
-OSM returns stale/extinct venues that don't correspond to real businesses. A venue is a **ghost** when Google returns `null` AND it has no OSM address (`address === " "`).
+OSM returns stale/extinct venues that don't correspond to real businesses. A venue is a **ghost** when Google returns `null` (no match or >300m distance rejection) or `{ closed: true }` (permanently closed). Any venue without a valid Google match is hidden — OSM address alone is not enough to keep a venue visible.
 
-**Distance gate (google.js):** If Google's best text match is >300m from the OSM coordinates, the entire result is rejected (returns `null`). This prevents showing rating/hours/price from a different business that happens to share a similar name. Previously only the address was nulled — now the full result is discarded.
+**Rejection rules (google.js):**
+- **Distance gate:** If Google's best text match is >300m from the OSM coordinates, the entire result is rejected (returns `null`). Prevents showing data from a different business with a similar name.
+- **Permanently closed:** If `businessStatus === "CLOSED_PERMANENTLY"`, returns `{ closed: true }` (distinct from `null` for cache differentiation).
 
 **How it works:**
-- `filterGhostVenues(venues)` in `src/api/cache.js` — batch filter used during OSM fetch and `mergeVenues`. Parses localStorage cache **once** for the whole array (not per-venue, which caused crashes).
-- `typeVenues` useMemo in `App.jsx` — checks `v.googleData === null && no address` in-memory (fast, no localStorage). Hides ghosts from both map and list instantly.
-- Google Places useEffect in `App.jsx` — when a ghost is detected (fresh API call or cache hit), sets `googleData: null` on the venue, closes the venue card, and shows a toast.
+- `filterGhostVenues(venues)` in `src/api/cache.js` — batch filter used during OSM fetch and `mergeVenues`. Parses localStorage cache **once** for the whole array. Removes venues where cached Google data is `null` or `{ closed: true }`.
+- `typeVenues` useMemo in `App.jsx` — checks `v.googleData === null || v.googleData?.closed` in-memory (fast, no localStorage). Hides ghosts from both map and list instantly.
+- Google Places useEffect in `App.jsx` — when a ghost is detected (fresh API call or cache hit) and venue is not already visited, sets `googleData` on the venue, closes the venue card, and shows a toast. Visited venues are never hidden.
 - Ghost venues are never visible but stay in the raw `venues` array until the next OSM fetch filters them out.
 
 **Flow:**
-1. First tap on ghost → Google API called, returns null (no match or >300m) → venue card closes with toast, ghost hidden in `typeVenues`
+1. First tap on ghost → Google API called, returns `null` or `{ closed: true }` → venue card closes with toast, ghost hidden in `typeVenues`
 2. Reload / revisit area → `filterGhostVenues` reads cache and strips ghost before it enters state
 
 **Remaining gap — name validation:** Google text search can match a different business with a similar name within 300m. `places.displayName` is not currently requested in the field mask, so there's no way to verify the name matches. Adding name validation would require requesting `displayName` and implementing fuzzy name comparison.

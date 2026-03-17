@@ -46,18 +46,13 @@ export function filterGhostVenues(venues) {
   return venues.filter((v) => {
     // If venue already has googleData in memory, use that
     if (v.googleData !== undefined) {
-      if (v.googleData?.closed) return false;
-      const noGoogleAddr =
-        v.googleData === null || (v.googleData && !v.googleData.address);
-      return !(noGoogleAddr && (!v.address || v.address.trim() === ""));
+      if (v.googleData === null || v.googleData?.closed) return false;
+      return true;
     }
     // Otherwise check localStorage cache
     const entry = cache[`google_${v.id}`];
     if (entry && now - entry.ts < CACHE_TTL) {
-      if (entry.data?.closed) return false;
-      const noGoogleAddr =
-        entry.data === null || (entry.data && !entry.data.address);
-      if (noGoogleAddr && (!v.address || v.address.trim() === "")) return false;
+      if (entry.data === null || entry.data?.closed) return false;
     }
     return true;
   });

@@ -102,11 +102,8 @@ export default function App() {
   const typeVenues = useMemo(() => {
     const filtered = venues.filter((v) => {
       if (v.type !== activeType) return false;
-      // Hide ghost venues: permanently closed OR (no Google address AND no OSM address)
-      if (v.googleData?.closed) return false;
-      const noGoogleAddr =
-        v.googleData === null || (v.googleData && !v.googleData.address);
-      if (noGoogleAddr && (!v.address || v.address.trim() === "")) return false;
+      // Hide ghost venues: no Google match, permanently closed, or no address from either source
+      if (v.googleData === null || v.googleData?.closed) return false;
       return true;
     });
     if (!userLocation) return filtered;
@@ -253,13 +250,9 @@ export default function App() {
         venueCacheRef.current[activeType] = updated;
         return updated;
       });
-      const isClosed = googleData?.closed;
-      const noGoogleAddr =
-        googleData === null || (googleData && !googleData.address);
       const ghost =
         !isVisited &&
-        (isClosed ||
-          (noGoogleAddr && (!venueAddress || venueAddress.trim() === "")));
+        (googleData === null || googleData?.closed);
       if (ghost) {
         setSelectedVenue(null);
         showToast("Venue not found — removed from map");
