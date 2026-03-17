@@ -521,7 +521,7 @@ export default function App() {
         <div>
           <div
             style={{
-              fontSize: 11,
+              fontSize: 20,
               letterSpacing: 3,
               color: "#f59e0b",
               textTransform: "uppercase",
@@ -532,7 +532,7 @@ export default function App() {
           </div>
           <div
             style={{
-              fontSize: 20,
+              fontSize: 17,
               fontWeight: 700,
               letterSpacing: -0.5,
               lineHeight: 1.1,

@@ -51,8 +51,9 @@ See **File Structure** below for the full layout. Features:
 **Passport Panel**
 - Visual stamp-book showing all visited venues across all types
 - Header card with total stamped count, type breakdown pills (emoji + count per type)
-- 2-column stamp grid grouped by type, sorted most-recent-first
-- Each stamp shows type emoji, venue name, visit date, visit count badge, and photo thumbnail if exists
+- Circular ink-stamp design: 130px dashed-border circles with subtle color tint, grouped by type in flex-wrap centered layout
+- Each stamp has a deterministic slight rotation (via `stampRotation` hash), type emoji (24px), venue name (9px uppercase, 2-line clamp), and passport-style date ("15 MAR 2026")
+- Visit count badge positioned inside the circle (`bottom: 14px, right: 14px`); photo thumbnail overlaps top-right edge
 - When passport tab is active, map shows only visited pins (all types, no unvisited)
 - "Search this area" button hidden in passport mode
 - Tapping a stamp selects the venue on the map
@@ -246,4 +247,4 @@ Category-specific milestones (Bar Fly, Coffee Snob, Sweet Tooth, Food Critic) an
 **Rarity Tiers** — Use Foursquare sub-categories to tag rare venues (Speakeasy, Jazz Bar, Roastery) as ⭐ rare — worth bonus XP or a special card badge.
 
 ### 4. Passport UI — DONE
-Stamp-book panel showing all visited venues across all types. Grouped by type with 2-column stamp grid, type breakdown pills, and map mode showing only visited pins. See **Passport Panel** section above for details.
+Stamp-book panel showing all visited venues across all types. Circular ink-stamp design with dashed borders and per-stamp rotation. Grouped by type in flex-wrap layout, type breakdown pills, and map mode showing only visited pins. See **Passport Panel** section above for details.

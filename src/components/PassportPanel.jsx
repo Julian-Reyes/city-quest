@@ -5,7 +5,19 @@ const TYPE_MAP = Object.fromEntries(VENUE_TYPES.map((t) => [t.id, t]));
 function formatDate(iso) {
   if (!iso) return "";
   const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return d
+    .toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    })
+    .toUpperCase();
+}
+
+function stampRotation(id) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return (h % 13) - 6;
 }
 
 export function PassportPanel({ venues, userLocation, onVenueClick }) {
@@ -54,7 +66,9 @@ export function PassportPanel({ venues, userLocation, onVenueClick }) {
   }));
 
   return (
-    <div style={{ height: "100%", overflowY: "auto", padding: "16px 12px 80px" }}>
+    <div
+      style={{ height: "100%", overflowY: "auto", padding: "16px 12px 80px" }}
+    >
       {/* Header card */}
       <div
         style={{
@@ -136,78 +150,63 @@ export function PassportPanel({ venues, userLocation, onVenueClick }) {
             </div>
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 8,
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 16,
+                justifyContent: "center",
+                padding: "8px 0",
               }}
             >
-              {grouped[typeId].map((v) => (
-                <div
-                  key={v.id}
-                  onClick={() => onVenueClick(v)}
-                  style={{
-                    background: "#141420",
-                    borderLeft: `3px solid ${typeInfo.color}`,
-                    borderRadius: 12,
-                    padding: "12px 10px",
-                    cursor: "pointer",
-                    position: "relative",
-                    minHeight: 80,
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  {/* Top row: emoji + photo */}
+              {grouped[typeId].map((v) => {
+                const color = typeInfo.color;
+                return (
                   <div
+                    key={v.id}
+                    onClick={() => onVenueClick(v)}
                     style={{
+                      width: 130,
+                      height: 130,
+                      borderRadius: "50%",
+                      border: `2px dashed ${color}`,
+                      background: `${color}0f`,
+                      color,
                       display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      marginBottom: 6,
-                    }}
-                  >
-                    <span style={{ fontSize: 16 }}>{typeInfo.emoji}</span>
-                    {v.photo && (
-                      <img
-                        src={v.photo}
-                        alt=""
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: "50%",
-                          objectFit: "cover",
-                        }}
-                      />
-                    )}
-                  </div>
-                  {/* Venue name */}
-                  <div
-                    style={{
-                      fontWeight: 700,
-                      fontSize: 12,
-                      lineHeight: 1.3,
-                      overflow: "hidden",
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                      marginBottom: 6,
-                    }}
-                  >
-                    {v.name}
-                  </div>
-                  {/* Bottom row: date + visit count */}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
+                      flexDirection: "column",
                       alignItems: "center",
+                      justifyContent: "center",
+                      padding: "16px 10px",
+                      cursor: "pointer",
+                      position: "relative",
+                      transform: `rotate(${stampRotation(v.id)}deg)`,
+                      transition: "transform 0.2s",
                     }}
                   >
+                    <span style={{ fontSize: 24, marginBottom: 4 }}>
+                      {typeInfo.emoji}
+                    </span>
                     <span
                       style={{
-                        fontSize: 10,
-                        color: "rgba(255,255,255,0.3)",
+                        fontSize: 9,
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: 1,
+                        textAlign: "center",
+                        lineHeight: 1.2,
+                        overflow: "hidden",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        maxWidth: 100,
+                      }}
+                    >
+                      {v.name}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 8,
+                        letterSpacing: 1.5,
+                        marginTop: 4,
+                        opacity: 0.7,
                       }}
                     >
                       {formatDate(v.visitedAt)}
@@ -215,20 +214,39 @@ export function PassportPanel({ venues, userLocation, onVenueClick }) {
                     {v.visitCount > 1 && (
                       <span
                         style={{
-                          fontSize: 10,
+                          position: "absolute",
+                          bottom: 10,
+                          right: 35,
+                          fontSize: 8,
                           fontWeight: 700,
-                          color: typeInfo.color,
-                          background: typeInfo.color + "1a",
-                          padding: "2px 6px",
-                          borderRadius: 8,
+                          padding: "1px 5px",
+                          borderRadius: 6,
+                          color,
+                          background: `${color}26`,
                         }}
                       >
                         x{v.visitCount}
                       </span>
                     )}
+                    {v.photo && (
+                      <img
+                        src={v.photo}
+                        alt=""
+                        style={{
+                          position: "absolute",
+                          top: -2,
+                          right: 6,
+                          width: 26,
+                          height: 26,
+                          borderRadius: "50%",
+                          objectFit: "cover",
+                          border: "2px solid #0f0f1a",
+                        }}
+                      />
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         );
