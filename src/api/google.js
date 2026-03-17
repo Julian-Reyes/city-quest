@@ -36,7 +36,7 @@ export async function fetchGooglePlaceDetails(name, lat, lng) {
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask":
           // "places.id,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.reviews",
-          "places.id,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.formattedAddress,places.location",
+          "places.id,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.formattedAddress,places.location,places.businessStatus",
       },
       body: JSON.stringify({
         textQuery: name,
@@ -94,6 +94,9 @@ export async function fetchGooglePlaceDetails(name, lat, lng) {
     // if (place.reviews?.[0]?.text?.text) {
     //   review = place.reviews[0].text.text;
     // }
+
+    // Reject permanently closed businesses — treat as ghost
+    if (place.businessStatus === "CLOSED_PERMANENTLY") return null;
 
     // Hole 2 fix: if Google's result is >300m from OSM coords, reject entirely.
     // A far-away match is a different business — don't pollute with its data.
