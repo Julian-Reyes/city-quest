@@ -64,7 +64,7 @@ function RecenterMap({ center, selectedVenue }) {
   return null;
 }
 
-function MapMoveDetector({ fetchCenter, onSearchArea }) {
+function MapMoveDetector({ fetchCenter, fetchZoom, onSearchArea }) {
   const map = useMapEvents({
     moveend: () => {
       if (!fetchCenter) return;
@@ -76,8 +76,16 @@ function MapMoveDetector({ fetchCenter, onSearchArea }) {
         center.lat,
         center.lng,
       );
-      if (zoom >= 12 && dist > 3) {
-        onSearchArea({ lat: center.lat, lng: center.lng, zoom });
+      // Compute visible radius from map bounds (center to edge in meters)
+      const bounds = map.getBounds();
+      const edgeLat = bounds.getNorth();
+      const R = 6371000;
+      const dLat = ((edgeLat - center.lat) * Math.PI) / 180;
+      const visibleRadius = Math.round(R * Math.abs(dLat));
+
+      // Show button when panned >1 mile or zoomed out from last fetch
+      if (zoom >= 12 && (dist > 1 || zoom < fetchZoom)) {
+        onSearchArea({ lat: center.lat, lng: center.lng, zoom, radius: visibleRadius });
       } else {
         onSearchArea(null);
       }
@@ -92,6 +100,7 @@ export function MapView({
   onVenueClick,
   selectedVenue,
   fetchCenter,
+  fetchZoom,
   onSearchArea,
   searchArea,
   isMobile,
@@ -111,7 +120,7 @@ export function MapView({
         maxZoom={19}
       />
       <RecenterMap center={userLocation} selectedVenue={selectedVenue} />
-      <MapMoveDetector fetchCenter={fetchCenter} onSearchArea={onSearchArea} />
+      <MapMoveDetector fetchCenter={fetchCenter} fetchZoom={fetchZoom} onSearchArea={onSearchArea} />
       {venues.map((venue) => (
         <Marker
           key={venue.id}

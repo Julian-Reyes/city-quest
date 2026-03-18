@@ -13,13 +13,13 @@
 function buildAddress(tags) {
   const num = tags["addr:housenumber"] || "";
   const street = tags["addr:street"] || "";
-  if (num && street) return `${num} ${street}`;
-  if (street) return street;
-  if (tags["addr:full"]) return tags["addr:full"];
-  const city = tags["addr:city"] || "";
-  const state = tags["addr:state"] || "";
-  if (city && state) return `${city}, ${state}`;
-  if (city) return city;
+
+  let base = "";
+  if (num && street) base = `${num} ${street}`;
+  else if (street) base = street;
+  else if (tags["addr:full"]) base = tags["addr:full"];
+
+  if (base) return base;
   if (tags["addr:suburb"]) return tags["addr:suburb"];
   if (tags["addr:neighbourhood"]) return tags["addr:neighbourhood"];
   if (tags["addr:place"]) return tags["addr:place"];
@@ -28,14 +28,21 @@ function buildAddress(tags) {
   return " "; //removed "Address not listed"
 }
 
-export async function fetchVenues(lat, lng, type, signal) {
-  const query = `[out:json][timeout:10];nwr["amenity"="${type}"](around:8000,${lat},${lng});out center body;`;
-  const res = await fetch("https://overpass-api.de/api/interpreter", {
-    method: "POST",
-    body: `data=${encodeURIComponent(query)}`,
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    signal,
-  });
+export async function fetchVenues(lat, lng, type, signal, radius = 4000) {
+  const query = `[out:json][timeout:10];nwr["amenity"="${type}"](around:${radius},${lat},${lng});out center body;`;
+
+  let res;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      body: `data=${encodeURIComponent(query)}`,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      signal,
+    });
+    if (res.status !== 429) break;
+    await new Promise((r) => setTimeout(r, (attempt + 1) * 2000));
+  }
+
   if (!res.ok) throw new Error(`Overpass API error: ${res.status}`);
   const data = await res.json();
   return data.elements

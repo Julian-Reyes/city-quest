@@ -24,6 +24,19 @@ const GOOGLE_PRICE_MAP = {
   PRICE_LEVEL_VERY_EXPENSIVE: 4,
 };
 
+// Strip zip code and country from Google's formatted address
+// "123 Main St, Austin, TX 78701, USA" → "123 Main St, Austin, TX"
+function cleanAddress(raw) {
+  if (!raw) return null;
+  // Remove country suffix (last comma-separated part)
+  const parts = raw.split(",").map((s) => s.trim());
+  if (parts.length >= 3) parts.pop(); // remove country
+  // Remove zip code from the state part (e.g. "TX 78701" → "TX")
+  const last = parts[parts.length - 1];
+  parts[parts.length - 1] = last.replace(/\s+\d{5}(-\d{4})?$/, "");
+  return parts.join(", ");
+}
+
 export async function fetchGooglePlaceDetails(name, lat, lng) {
   const apiKey = import.meta.env.VITE_GOOGLE_PLACES_KEY;
   if (!apiKey) return null;
@@ -110,7 +123,7 @@ export async function fetchGooglePlaceDetails(name, lat, lng) {
       price: GOOGLE_PRICE_MAP[place.priceLevel] ?? null,
       hours,
       // review,
-      address: place.formattedAddress || null,
+      address: cleanAddress(place.formattedAddress),
     };
   } catch (err) {
     console.error("Google Places fetch error:", err);

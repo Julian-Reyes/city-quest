@@ -6,7 +6,7 @@ OSM (OpenStreetMap) is our free venue discovery source, but its data has quality
 
 1. **Stale venues** — businesses that closed, changed names, or changed ownership still appear
 2. **Wrong locations** — some venues are marked at incorrect coordinates
-3. **Missing addresses** — many venues have no `addr:*` tags at all
+3. **Missing addresses** — many venues have no `addr:*` tags at all (ghost-filtered). Venues with street-only addresses are now enriched with city/state from Nominatim.
 4. **Ghost venues** — some entries don't correspond to any real-world business (can't be found on Google Maps)
 
 We enrich venues with Google Places + Foursquare on click, but the **matching is fuzzy** — we search Google Text Search with just the venue name + a 500m location bias. This causes:
@@ -27,6 +27,15 @@ We enrich venues with Google Places + Foursquare on click, but the **matching is
 - Ghost check in `typeVenues` useMemo in `App.jsx` — reads in-memory `v.googleData` (no localStorage hit) so both map and list instantly hide ghosts when they're identified.
 - Google Places useEffect in `App.jsx` — when a ghost is detected (fresh fetch or cache hit), sets `googleData: null` on the venue, closes the venue card, and shows a toast.
 - Definition: ghost = `googleData === null` AND `address === " "` (no OSM address tags)
+
+### Address enrichment (`src/App.jsx`)
+- OSM `buildAddress()` returns street-only addresses (e.g., "123 Main St") or `" "` for venues with no address tags
+- The existing Nominatim reverse geocode (used for the header city name) also builds an `areaSuffix` like "Austin, TX"
+- `enrichAddress(address, suffix)` appends the suffix to street-only addresses (no comma = no city/state yet)
+- Blank/space addresses pass through unchanged — preserves the ghost filter signal
+- Enrichment runs **after** `filterGhostVenues()` to prevent ghosts from getting fake addresses
+- A `useEffect` watching `areaSuffix` re-enriches current venues when Nominatim resolves after the venue fetch (handles race condition)
+- US state names abbreviated via `STATE_ABBREV` map ("Texas" → "TX") for consistency with Google's `cleanAddress` output
 
 ### Client-side API cache (`src/api/cache.js`)
 - Google + Foursquare API responses cached in localStorage under key `cityquest_api_cache`
@@ -50,6 +59,7 @@ The core issue is **OSM data quality**, not just matching accuracy. Many venues 
 - **Phase 1** — Better matching (client-side only, no infra):
   - ✅ Ghost venue filtering (hide venues Google can't match + no OSM address)
   - ✅ Address-only gating at 300m distance
+  - ✅ City/state enrichment — OSM street-only addresses enriched with Nominatim area suffix (reuses existing reverse geocode, no extra API calls)
   - ❌ Preserve `osmTags` on venue objects so we can build richer queries
   - ❌ Build `textQuery` with address context: `"Starbucks, 123 Main St"` instead of `"Starbucks"`
   - ❌ Add `places.displayName` to field mask and validate name similarity

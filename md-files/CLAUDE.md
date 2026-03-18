@@ -27,7 +27,7 @@ See **File Structure** below for the full layout. Features:
 - Geolocation requested on load
 
 **Real Venue Data (3 API sources)**
-- **Overpass API (OpenStreetMap)** — fetches real venue locations (name, address, coords) based on map viewport. Free, no key needed.
+- **Overpass API (OpenStreetMap)** — fetches real venue locations (name, address, coords) based on map viewport. Free, no key needed. Returns street-only addresses (e.g., "123 Main St"); city/state enrichment happens in App.jsx via Nominatim.
 - **Foursquare Places API** — enriches venues with human-readable categories (e.g., "Cocktail Bar", "Dive Bar", "Speakeasy")
 - **Google Places API (New)** — enriches venues with rating, rating count, price level, and opening hours
 - All API data is fetched on venue click and cached on the venue object
@@ -133,15 +133,17 @@ All files use named exports; only App uses a default export.
 
 ### APIs
 
-1. **OpenStreetMap / Overpass API** — Free, no key needed. Fetches real venue locations based on map viewport.
+1. **OpenStreetMap / Overpass API** — Free, no key needed. Fetches real venue locations based on map viewport. `buildAddress()` returns street-only addresses or `" "` (space) for venues with no OSM address tags.
 
-2. **Google Places API (New)** — Enriches venues with rating, rating count, price level, and opening hours.
+2. **Nominatim Reverse Geocode** — Single call per `fetchCenter` change. Returns city name (for header) and builds an `areaSuffix` string (e.g., "Austin, TX") used to enrich OSM addresses. US state names are abbreviated via a `STATE_ABBREV` map in App.jsx. The `enrichAddress(address, suffix)` helper appends the suffix only to non-blank, comma-free addresses — blank/space addresses pass through unchanged so ghost filtering still works. Enrichment runs after `filterGhostVenues()`. A `useEffect` watching `areaSuffix` re-enriches existing venues when Nominatim resolves after the venue fetch.
+
+3. **Google Places API (New)** — Enriches venues with rating, rating count, price level, and opening hours.
    - Direct browser calls in production (CORS supported)
    - API key in GitHub repo secret `VITE_GOOGLE_PLACES_KEY`
    - HTTP referrer restrictions: `julian-reyes.github.io/*`, `julianreyes.dev/*`, `localhost:5174/*`
    - `GOOGLE_BASE` constant in `src/api/google.js` switches between `/api/google` (dev proxy) and `https://places.googleapis.com` (prod direct)
 
-3. **Foursquare Places API** — Provides human-readable venue categories.
+4. **Foursquare Places API** — Provides human-readable venue categories.
    - Proxied via Cloudflare Worker in production (Foursquare blocks CORS)
    - Worker URL: `https://fsq-proxy.city-quest.workers.dev`
    - Worker source: `workers/fsq-proxy/worker.js`
@@ -176,6 +178,8 @@ OSM returns stale/extinct venues that don't correspond to real businesses. A ven
 **Flow:**
 1. First tap on ghost → Google API called, returns `null` or `{ closed: true }` → venue card closes with toast, ghost hidden in `typeVenues`
 2. Reload / revisit area → `filterGhostVenues` reads cache and strips ghost before it enters state
+
+**Critical ordering — city/state enrichment:** `enrichAddress()` must run AFTER `filterGhostVenues()`. Ghost venues have `address: " "` (space). If enriched first, they'd get a city/state suffix and survive the `address.trim() === ""` check. The `enrichAddress` helper also guards this by returning blank addresses unchanged, but the ordering provides defense in depth.
 
 **Remaining gap — name validation:** Google text search can match a different business with a similar name within 300m. `places.displayName` is not currently requested in the field mask, so there's no way to verify the name matches. Adding name validation would require requesting `displayName` and implementing fuzzy name comparison.
 
@@ -248,5 +252,26 @@ Category-specific milestones (Bar Fly, Coffee Snob, Sweet Tooth, Food Critic) an
 
 **Rarity Tiers** — Use Foursquare sub-categories to tag rare venues (Speakeasy, Jazz Bar, Roastery) as ⭐ rare — worth bonus XP or a special card badge.
 
-### 4. Passport UI — DONE
+### 4. Fix Inaccurate OSM Coordinates
+Some OSM venues (especially from bulk imports like SanGIS) have inaccurate coordinates. When Google finds the correct business but it's >300m from the OSM pin, the distance gate rejects the result, causing the venue to be ghost-filtered.
+
+**Proposed fix:**
+- Request `places.displayName` in the Google field mask
+- If the Google name fuzzy-matches the OSM name, allow a larger distance threshold (e.g., 2km instead of 300m)
+- When a match is accepted, relocate the venue's map pin to Google's coordinates (more accurate)
+- This fixes venues like "Kellys Pub" where OSM has bad coords but Google knows the real location
+
+**Example:** Kelly's Pub (OSM node 365318102) — OSM coords are off, Google finds the real location but >300m away, distance gate rejects → venue loses Google data → ghost-filtered because no OSM address.
+
+### 5. Cache Version Invalidation
+When ghost filter logic changes, browsers with old cached Google data can show stale results (e.g., ghost venues appearing with old rating/hours). Currently requires manual `localStorage.removeItem('cityquest_api_cache')`.
+
+**Proposed fix:**
+- Add a `CACHE_VERSION` constant to `src/api/cache.js`
+- Store version as `_version` key inside the cache object
+- On read (`getApiCache`, `filterGhostVenues`): if version mismatch, wipe cache and return miss
+- On write (`setApiCache`): stamp `_version` on every write
+- Bump `CACHE_VERSION` whenever ghost filter logic changes to auto-invalidate old entries
+
+### 6. Passport UI — DONE
 Stamp-book panel showing all visited venues across all types. Circular ink-stamp design with dashed borders and per-stamp rotation. Grouped by type in flex-wrap layout, type breakdown pills, and map mode showing only visited pins. See **Passport Panel** section above for details.

@@ -50,6 +50,29 @@ import { PassportPanel } from "./components/PassportPanel";
 import { BottomSheet } from "./components/BottomSheet";
 import { CameraOverlay } from "./components/CameraOverlay";
 
+// ── US state abbreviation map (Nominatim returns full names, Google uses abbrevs) ──
+const STATE_ABBREV = {
+  Alabama: "AL", Alaska: "AK", Arizona: "AZ", Arkansas: "AR", California: "CA",
+  Colorado: "CO", Connecticut: "CT", Delaware: "DE", Florida: "FL", Georgia: "GA",
+  Hawaii: "HI", Idaho: "ID", Illinois: "IL", Indiana: "IN", Iowa: "IA",
+  Kansas: "KS", Kentucky: "KY", Louisiana: "LA", Maine: "ME", Maryland: "MD",
+  Massachusetts: "MA", Michigan: "MI", Minnesota: "MN", Mississippi: "MS",
+  Missouri: "MO", Montana: "MT", Nebraska: "NE", Nevada: "NV",
+  "New Hampshire": "NH", "New Jersey": "NJ", "New Mexico": "NM", "New York": "NY",
+  "North Carolina": "NC", "North Dakota": "ND", Ohio: "OH", Oklahoma: "OK",
+  Oregon: "OR", Pennsylvania: "PA", "Rhode Island": "RI", "South Carolina": "SC",
+  "South Dakota": "SD", Tennessee: "TN", Texas: "TX", Utah: "UT", Vermont: "VT",
+  Virginia: "VA", Washington: "WA", "West Virginia": "WV", Wisconsin: "WI",
+  Wyoming: "WY", "District of Columbia": "DC",
+};
+
+function enrichAddress(address, suffix) {
+  if (!address || address.trim() === "" || !suffix) return address;
+  // Only enrich street-only addresses (no comma = no city/state yet)
+  if (address.includes(",")) return address;
+  return `${address}, ${suffix}`;
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const isDesktop = useIsDesktop();
@@ -102,8 +125,9 @@ export default function App() {
   const typeVenues = useMemo(() => {
     const filtered = venues.filter((v) => {
       if (v.type !== activeType) return false;
-      // Hide ghost venues: no Google match, permanently closed, or no address from either source
-      if (v.googleData === null || v.googleData?.closed) return false;
+      // Hide ghost venues: permanently closed always hidden; no Google match only hidden if no OSM address
+      if (v.googleData?.closed) return false;
+      if (v.googleData === null && (!v.address || v.address.trim() === "")) return false;
       return true;
     });
     if (!userLocation) return filtered;
@@ -129,7 +153,9 @@ export default function App() {
 
   // ── Track user location (blue dot + initial fetch center) ──
   const [fetchCenter, setFetchCenter] = useState(null);
+  const fetchZoomRef = useRef(14); // zoom level of last fetch (default map zoom)
   const [cityName, setCityName] = useState("");
+  const [areaSuffix, setAreaSuffix] = useState("");
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -161,9 +187,11 @@ export default function App() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // ── Reverse geocode city name ──
+  // ── Reverse geocode city name + area suffix ──
   useEffect(() => {
     if (!fetchCenter) return;
+    setCityName("");
+    setAreaSuffix("");
     fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${fetchCenter.lat}&lon=${fetchCenter.lng}&format=json&zoom=10`,
     )
@@ -176,6 +204,9 @@ export default function App() {
           data.address?.county ||
           "";
         setCityName(city);
+        const state = data.address?.state || "";
+        const stateAbbrev = STATE_ABBREV[state] || state;
+        setAreaSuffix([city, stateAbbrev].filter(Boolean).join(", "));
       })
       .catch(() => {});
   }, [fetchCenter]);
@@ -244,22 +275,34 @@ export default function App() {
   const applyGoogleData = useCallback(
     (venueId, venueAddress, googleData, isVisited) => {
       setVenues((prev) => {
-        const updated = prev.map((v) =>
-          v.id === venueId ? { ...v, googleData } : v,
-        );
+        const updated = prev.map((v) => {
+          if (v.id !== venueId) return v;
+          const patch = { ...v, googleData };
+          // Backfill address from Google when OSM has none
+          if (googleData?.address && (!v.address || v.address.trim() === "")) {
+            patch.address = googleData.address;
+          }
+          return patch;
+        });
         venueCacheRef.current[activeType] = updated;
         return updated;
       });
       const ghost =
         !isVisited &&
-        (googleData === null || googleData?.closed);
+        (googleData?.closed ||
+          (googleData === null && (!venueAddress || venueAddress.trim() === "")));
       if (ghost) {
         setSelectedVenue(null);
         showToast("Venue not found — removed from map");
       } else {
-        setSelectedVenue((prev) =>
-          prev && prev.id === venueId ? { ...prev, googleData } : prev,
-        );
+        setSelectedVenue((prev) => {
+          if (!prev || prev.id !== venueId) return prev;
+          const patch = { ...prev, googleData };
+          if (googleData?.address && (!prev.address || prev.address.trim() === "")) {
+            patch.address = googleData.address;
+          }
+          return patch;
+        });
       }
       setGoogleLoading(false);
     },
@@ -367,7 +410,12 @@ export default function App() {
     setLoading(true);
     fetchVenues(fetchCenter.lat, fetchCenter.lng, activeType, controller.signal)
       .then((fetched) => {
-        const hydrated = hydrateVisits(filterGhostVenues(fetched));
+        const filtered = filterGhostVenues(fetched);
+        const enriched = filtered.map((v) => ({
+          ...v,
+          address: enrichAddress(v.address, areaSuffix),
+        }));
+        const hydrated = hydrateVisits(enriched);
         if (backfillVisitTypes(hydrated)) {
           visitsRef.current = getVisits();
           setVisitStats(getVisitStats());
@@ -398,7 +446,8 @@ export default function App() {
     setSearchArea(null);
     const newCenter = { lat: searchArea.lat, lng: searchArea.lng };
     setFetchCenter(newCenter);
-    fetchVenues(newCenter.lat, newCenter.lng, activeType, controller.signal)
+    fetchZoomRef.current = searchArea.zoom;
+    fetchVenues(newCenter.lat, newCenter.lng, activeType, controller.signal, searchArea.radius)
       .then((fetched) => {
         if (backfillVisitTypes(fetched)) {
           visitsRef.current = getVisits();
@@ -406,8 +455,12 @@ export default function App() {
         }
         setVenues((prev) => {
           const merged = mergeVenues(prev, fetched);
-          venueCacheRef.current[activeType] = merged;
-          return merged;
+          const enriched = merged.map((v) => ({
+            ...v,
+            address: enrichAddress(v.address, areaSuffix),
+          }));
+          venueCacheRef.current[activeType] = enriched;
+          return enriched;
         });
         setLoading(false);
       })
@@ -416,7 +469,20 @@ export default function App() {
         console.error("Failed to fetch venues:", err);
         setLoading(false);
       });
-  }, [searchArea, activeType, mergeVenues]);
+  }, [searchArea, activeType, areaSuffix, mergeVenues]);
+
+  // ── Re-enrich addresses when areaSuffix arrives (Nominatim may resolve after venues) ──
+  useEffect(() => {
+    if (!areaSuffix) return;
+    setVenues((prev) => {
+      const updated = prev.map((v) => ({
+        ...v,
+        address: enrichAddress(v.address, areaSuffix),
+      }));
+      venueCacheRef.current[activeType] = updated;
+      return updated;
+    });
+  }, [areaSuffix, activeType]);
 
   const handleCheckin = useCallback(async () => {
     if (!selectedVenue) return;
@@ -764,6 +830,7 @@ export default function App() {
               userLocation={userLocation}
               selectedVenue={selectedVenue}
               fetchCenter={fetchCenter}
+              fetchZoom={fetchZoomRef.current}
               searchArea={searchArea}
               onSearchArea={setSearchArea}
               isMobile={!isDesktop}
