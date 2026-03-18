@@ -14,7 +14,8 @@ The app was originally a single-file `App.jsx` (~2000 lines) and has been split 
 See **File Structure** below for the full layout. Features:
 
 **UI & Navigation**
-- Header with venue type name, visited count, and completion percentage
+- Header with venue type name, city edition subtitle, visited count, and completion percentage
+- City edition text (e.g. "— San Diego Edition") uses non-breaking spaces (`\u00A0`) so it stays as one unit — fits on line 1 with "Bar Hunter" if short, wraps entirely to line 2 if long
 - Venue type switcher (Bars 🍺 / Coffee ☕ / Ice Cream 🍦 / Food 🍔)
 - Animated progress bar showing % of venues visited
 - Bottom nav with List / Awards / Passport tabs

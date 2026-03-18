@@ -52,18 +52,57 @@ import { CameraOverlay } from "./components/CameraOverlay";
 
 // ── US state abbreviation map (Nominatim returns full names, Google uses abbrevs) ──
 const STATE_ABBREV = {
-  Alabama: "AL", Alaska: "AK", Arizona: "AZ", Arkansas: "AR", California: "CA",
-  Colorado: "CO", Connecticut: "CT", Delaware: "DE", Florida: "FL", Georgia: "GA",
-  Hawaii: "HI", Idaho: "ID", Illinois: "IL", Indiana: "IN", Iowa: "IA",
-  Kansas: "KS", Kentucky: "KY", Louisiana: "LA", Maine: "ME", Maryland: "MD",
-  Massachusetts: "MA", Michigan: "MI", Minnesota: "MN", Mississippi: "MS",
-  Missouri: "MO", Montana: "MT", Nebraska: "NE", Nevada: "NV",
-  "New Hampshire": "NH", "New Jersey": "NJ", "New Mexico": "NM", "New York": "NY",
-  "North Carolina": "NC", "North Dakota": "ND", Ohio: "OH", Oklahoma: "OK",
-  Oregon: "OR", Pennsylvania: "PA", "Rhode Island": "RI", "South Carolina": "SC",
-  "South Dakota": "SD", Tennessee: "TN", Texas: "TX", Utah: "UT", Vermont: "VT",
-  Virginia: "VA", Washington: "WA", "West Virginia": "WV", Wisconsin: "WI",
-  Wyoming: "WY", "District of Columbia": "DC",
+  Alabama: "AL",
+  Alaska: "AK",
+  Arizona: "AZ",
+  Arkansas: "AR",
+  California: "CA",
+  Colorado: "CO",
+  Connecticut: "CT",
+  Delaware: "DE",
+  Florida: "FL",
+  Georgia: "GA",
+  Hawaii: "HI",
+  Idaho: "ID",
+  Illinois: "IL",
+  Indiana: "IN",
+  Iowa: "IA",
+  Kansas: "KS",
+  Kentucky: "KY",
+  Louisiana: "LA",
+  Maine: "ME",
+  Maryland: "MD",
+  Massachusetts: "MA",
+  Michigan: "MI",
+  Minnesota: "MN",
+  Mississippi: "MS",
+  Missouri: "MO",
+  Montana: "MT",
+  Nebraska: "NE",
+  Nevada: "NV",
+  "New Hampshire": "NH",
+  "New Jersey": "NJ",
+  "New Mexico": "NM",
+  "New York": "NY",
+  "North Carolina": "NC",
+  "North Dakota": "ND",
+  Ohio: "OH",
+  Oklahoma: "OK",
+  Oregon: "OR",
+  Pennsylvania: "PA",
+  "Rhode Island": "RI",
+  "South Carolina": "SC",
+  "South Dakota": "SD",
+  Tennessee: "TN",
+  Texas: "TX",
+  Utah: "UT",
+  Vermont: "VT",
+  Virginia: "VA",
+  Washington: "WA",
+  "West Virginia": "WV",
+  Wisconsin: "WI",
+  Wyoming: "WY",
+  "District of Columbia": "DC",
 };
 
 function enrichAddress(address, suffix) {
@@ -127,7 +166,8 @@ export default function App() {
       if (v.type !== activeType) return false;
       // Hide ghost venues: permanently closed always hidden; no Google match only hidden if no OSM address
       if (v.googleData?.closed) return false;
-      if (v.googleData === null && (!v.address || v.address.trim() === "")) return false;
+      if (v.googleData === null && (!v.address || v.address.trim() === ""))
+        return false;
       return true;
     });
     if (!userLocation) return filtered;
@@ -290,7 +330,8 @@ export default function App() {
       const ghost =
         !isVisited &&
         (googleData?.closed ||
-          (googleData === null && (!venueAddress || venueAddress.trim() === "")));
+          (googleData === null &&
+            (!venueAddress || venueAddress.trim() === "")));
       if (ghost) {
         setSelectedVenue(null);
         showToast("Venue not found — removed from map");
@@ -298,7 +339,10 @@ export default function App() {
         setSelectedVenue((prev) => {
           if (!prev || prev.id !== venueId) return prev;
           const patch = { ...prev, googleData };
-          if (googleData?.address && (!prev.address || prev.address.trim() === "")) {
+          if (
+            googleData?.address &&
+            (!prev.address || prev.address.trim() === "")
+          ) {
             patch.address = googleData.address;
           }
           return patch;
@@ -447,7 +491,13 @@ export default function App() {
     const newCenter = { lat: searchArea.lat, lng: searchArea.lng };
     setFetchCenter(newCenter);
     fetchZoomRef.current = searchArea.zoom;
-    fetchVenues(newCenter.lat, newCenter.lng, activeType, controller.signal, searchArea.radius)
+    fetchVenues(
+      newCenter.lat,
+      newCenter.lng,
+      activeType,
+      controller.signal,
+      searchArea.radius,
+    )
       .then((fetched) => {
         if (backfillVisitTypes(fetched)) {
           visitsRef.current = getVisits();
@@ -579,7 +629,7 @@ export default function App() {
           zIndex: 100,
         }}
       >
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
               fontSize: 20,
@@ -597,14 +647,18 @@ export default function App() {
               fontWeight: 700,
               letterSpacing: -0.5,
               lineHeight: 1.1,
+              paddingTop: 3,
             }}
           >
-            {VENUE_TYPES.find((t) => t.id === activeType)?.emoji}{" "}
-            {VENUE_TYPES.find((t) => t.id === activeType)?.label} Hunter
-            {cityName && ` — ${cityName} Edition`}
+            <span style={{ whiteSpace: "nowrap" }}>
+              {VENUE_TYPES.find((t) => t.id === activeType)?.emoji}{" "}
+              {VENUE_TYPES.find((t) => t.id === activeType)?.label} Hunter -
+            </span>
+            {cityName &&
+              `\u00A0${cityName.replace(/ /g, "\u00A0")}\u00A0Edition`}
           </div>
         </div>
-        <div style={{ textAlign: "right" }}>
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div
             style={{
               fontSize: 28,
@@ -630,6 +684,7 @@ export default function App() {
               color: "rgba(255,255,255,0.4)",
               letterSpacing: 2,
               textTransform: "uppercase",
+              paddingTop: 7,
             }}
           >
             {completionPct}% complete
