@@ -1,6 +1,4 @@
-import { VENUE_TYPES } from "../constants";
-
-const TYPE_MAP = Object.fromEntries(VENUE_TYPES.map((t) => [t.id, t]));
+import { VENUE_CATEGORIES, CATEGORY_MAP } from "../constants";
 
 function formatDate(iso) {
   if (!iso) return "";
@@ -51,8 +49,8 @@ export function PassportPanel({ venues, userLocation, onVenueClick }) {
     arr.sort((a, b) => new Date(b.visitedAt) - new Date(a.visitedAt));
   }
 
-  // Order groups by VENUE_TYPES order, skip types with no visits
-  const orderedTypes = VENUE_TYPES.map((t) => t.id).filter((id) => grouped[id]);
+  // Order groups by VENUE_CATEGORIES order, skip types with no visits
+  const orderedTypes = VENUE_CATEGORIES.map((t) => t.id).filter((id) => grouped[id]);
   // Append any unknown types at end
   for (const key of Object.keys(grouped)) {
     if (!orderedTypes.includes(key)) orderedTypes.push(key);
@@ -62,7 +60,7 @@ export function PassportPanel({ venues, userLocation, onVenueClick }) {
   const typeCounts = orderedTypes.map((id) => ({
     id,
     count: grouped[id].length,
-    ...TYPE_MAP[id],
+    ...CATEGORY_MAP[id],
   }));
 
   return (
@@ -129,7 +127,7 @@ export function PassportPanel({ venues, userLocation, onVenueClick }) {
 
       {/* Stamp grid grouped by type */}
       {orderedTypes.map((typeId) => {
-        const typeInfo = TYPE_MAP[typeId] || {
+        const typeInfo = CATEGORY_MAP[typeId] || {
           emoji: "📍",
           label: typeId,
           color: "#888",

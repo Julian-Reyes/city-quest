@@ -5,7 +5,7 @@
  * (venues, user location, selected venue, UI panels) and wires together
  * the extracted modules:
  *
- *   - constants.js        → VENUE_TYPES, ACHIEVEMENTS
+ *   - constants.js        → QUEST_TYPES, CATEGORY_MAP, ACHIEVEMENTS
  *   - api/cache.js        → getApiCache, setApiCache, filterGhostVenues
  *   - api/overpass.js      → fetchVenues (OSM data)
  *   - api/foursquare.js    → fetchFoursquareDetails (categories)
@@ -22,7 +22,12 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import "leaflet/dist/leaflet.css";
 
 // ── Data & API ──
-import { VENUE_TYPES, ACHIEVEMENTS } from "./constants";
+import {
+  QUEST_TYPES,
+  CATEGORY_MAP,
+  getCategoriesForQuest,
+  ACHIEVEMENTS,
+} from "./constants";
 import { getApiCache, setApiCache, filterGhostVenues } from "./api/cache";
 import { fetchVenues } from "./api/overpass";
 import { fetchFoursquareDetails } from "./api/foursquare";
@@ -115,7 +120,8 @@ function enrichAddress(address, suffix) {
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const isDesktop = useIsDesktop();
-  const [activeType, setActiveType] = useState("bar");
+  const [activeQuest, setActiveQuest] = useState("day_explorer");
+  const [activeCategory, setActiveCategory] = useState("park");
   const [venues, setVenues] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
   const [selectedVenue, setSelectedVenue] = useState(null);
@@ -163,7 +169,7 @@ export default function App() {
   const visitedCount = visitStats.total;
   const typeVenues = useMemo(() => {
     const filtered = venues.filter((v) => {
-      if (v.type !== activeType) return false;
+      if (v.type !== activeCategory) return false;
       // Hide ghost venues: permanently closed always hidden; no Google match only hidden if no OSM address
       if (v.googleData?.closed) return false;
       if (v.googleData === null && (!v.address || v.address.trim() === ""))
@@ -178,7 +184,7 @@ export default function App() {
         (a.lng - lng) ** 2 -
         ((b.lat - lat) ** 2 + (b.lng - lng) ** 2),
     );
-  }, [venues, activeType, userLocation]);
+  }, [venues, activeCategory, userLocation]);
   const typeVisited = typeVenues.filter((v) => v.visited).length;
 
   const passportVenues = useMemo(() => {
@@ -265,7 +271,7 @@ export default function App() {
         const updated = prev.map((v) =>
           v.id === selectedVenue.id ? { ...v, fsqData } : v,
         );
-        venueCacheRef.current[activeType] = updated;
+        venueCacheRef.current[activeCategory] = updated;
         return updated;
       });
       setSelectedVenue((prev) =>
@@ -291,7 +297,7 @@ export default function App() {
           const updated = prev.map((v) =>
             v.id === selectedVenue.id ? { ...v, fsqData } : v,
           );
-          venueCacheRef.current[activeType] = updated;
+          venueCacheRef.current[activeCategory] = updated;
           return updated;
         });
         setSelectedVenue((prev) =>
@@ -324,7 +330,7 @@ export default function App() {
           }
           return patch;
         });
-        venueCacheRef.current[activeType] = updated;
+        venueCacheRef.current[activeCategory] = updated;
         return updated;
       });
       const ghost =
@@ -350,7 +356,7 @@ export default function App() {
       }
       setGoogleLoading(false);
     },
-    [activeType],
+    [activeCategory],
   );
 
   useEffect(() => {
@@ -445,14 +451,14 @@ export default function App() {
     if (!fetchCenter) return;
     const controller = new AbortController();
 
-    if (venueCacheRef.current[activeType]) {
-      setVenues(venueCacheRef.current[activeType]);
+    if (venueCacheRef.current[activeCategory]) {
+      setVenues(venueCacheRef.current[activeCategory]);
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    fetchVenues(fetchCenter.lat, fetchCenter.lng, activeType, controller.signal)
+    fetchVenues(fetchCenter.lat, fetchCenter.lng, activeCategory, controller.signal)
       .then((fetched) => {
         const filtered = filterGhostVenues(fetched);
         const enriched = filtered.map((v) => ({
@@ -465,11 +471,11 @@ export default function App() {
           setVisitStats(getVisitStats());
         }
         // Inject visited venues from localStorage so they show even outside search area
-        const savedVisited = getVisitedVenues(activeType);
+        const savedVisited = getVisitedVenues(activeCategory);
         const withSaved = savedVisited.length
           ? mergeVenues(savedVisited, hydrated)
           : hydrated;
-        venueCacheRef.current[activeType] = withSaved;
+        venueCacheRef.current[activeCategory] = withSaved;
         setVenues(withSaved);
         setLoading(false);
       })
@@ -481,7 +487,7 @@ export default function App() {
       });
 
     return () => controller.abort();
-  }, [activeType, fetchCenter]);
+  }, [activeCategory, fetchCenter]);
 
   // ── Search this area handler ──
   const handleSearchArea = useCallback(() => {
@@ -494,7 +500,7 @@ export default function App() {
     fetchVenues(
       newCenter.lat,
       newCenter.lng,
-      activeType,
+      activeCategory,
       controller.signal,
       searchArea.radius,
     )
@@ -509,7 +515,7 @@ export default function App() {
             ...v,
             address: enrichAddress(v.address, areaSuffix),
           }));
-          venueCacheRef.current[activeType] = enriched;
+          venueCacheRef.current[activeCategory] = enriched;
           return enriched;
         });
         setLoading(false);
@@ -519,7 +525,7 @@ export default function App() {
         console.error("Failed to fetch venues:", err);
         setLoading(false);
       });
-  }, [searchArea, activeType, areaSuffix, mergeVenues]);
+  }, [searchArea, activeCategory, areaSuffix, mergeVenues]);
 
   // ── Re-enrich addresses when areaSuffix arrives (Nominatim may resolve after venues) ──
   useEffect(() => {
@@ -529,10 +535,10 @@ export default function App() {
         ...v,
         address: enrichAddress(v.address, areaSuffix),
       }));
-      venueCacheRef.current[activeType] = updated;
+      venueCacheRef.current[activeCategory] = updated;
       return updated;
     });
-  }, [areaSuffix, activeType]);
+  }, [areaSuffix, activeCategory]);
 
   const handleCheckin = useCallback(async () => {
     if (!selectedVenue) return;
@@ -551,7 +557,7 @@ export default function App() {
     const statsBefore = getVisitStats();
 
     // Persist to localStorage
-    addVisit(selectedVenue.id, visit, savedPhoto, activeType, {
+    addVisit(selectedVenue.id, visit, savedPhoto, activeCategory, {
       name: selectedVenue.name,
       lat: selectedVenue.lat,
       lng: selectedVenue.lng,
@@ -574,7 +580,7 @@ export default function App() {
         };
       });
       // Fix: sync venueCacheRef so tab switching preserves check-ins
-      venueCacheRef.current[activeType] = updated;
+      venueCacheRef.current[activeCategory] = updated;
       return updated;
     });
 
@@ -593,7 +599,7 @@ export default function App() {
     setPhoto(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     showToast(`✅ Checked in to ${selectedVenue.name}!`);
-  }, [selectedVenue, note, photo, activeType]);
+  }, [selectedVenue, note, photo, activeCategory]);
 
   const completionPct = typeVenues.length
     ? Math.round((typeVisited / typeVenues.length) * 100)
@@ -651,11 +657,12 @@ export default function App() {
             }}
           >
             <span style={{ whiteSpace: "nowrap" }}>
-              {VENUE_TYPES.find((t) => t.id === activeType)?.emoji}{" "}
-              {VENUE_TYPES.find((t) => t.id === activeType)?.label} Hunter -
+              {QUEST_TYPES.find((q) => q.id === activeQuest)?.emoji}{" "}
+              {QUEST_TYPES.find((q) => q.id === activeQuest)?.label}
+              {cityName ? " -" : ""}
             </span>
             {cityName &&
-              `\u00A0${cityName.replace(/ /g, "\u00A0")}\u00A0Edition`}
+              `\u00A0${cityName.replace(/ /g, "\u00A0")}`}
           </div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -692,7 +699,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── TYPE SWITCHER ── */}
+      {/* ── QUEST SELECTOR ── */}
       <div
         style={{
           display: "flex",
@@ -702,16 +709,19 @@ export default function App() {
           flexShrink: 0,
         }}
       >
-        {VENUE_TYPES.map((t) => (
+        {QUEST_TYPES.map((q) => (
           <button
-            key={t.id}
+            key={q.id}
             onClick={() => {
-              setActiveType(t.id);
+              if (q.id === activeQuest) return;
+              setActiveQuest(q.id);
+              const firstCat = getCategoriesForQuest(q.id)[0];
+              setActiveCategory(firstCat.id);
               setSelectedVenue(null);
               setSearchArea(null);
               if (!isDesktop) setSheetState("peek");
-              if (venueCacheRef.current[t.id]) {
-                setVenues(venueCacheRef.current[t.id]);
+              if (venueCacheRef.current[firstCat.id]) {
+                setVenues(venueCacheRef.current[firstCat.id]);
                 setLoading(false);
               } else {
                 setVenues([]);
@@ -720,39 +730,108 @@ export default function App() {
             }}
             style={{
               flex: 1,
-              padding: isDesktop ? "10px 4px" : "6px 4px",
+              padding: isDesktop ? "8px 4px" : "5px 4px",
               background:
-                activeType === t.id ? "rgba(255,255,255,0.06)" : "transparent",
+                activeQuest === q.id ? "rgba(255,255,255,0.06)" : "transparent",
               border: "none",
-              color: activeType === t.id ? t.color : "rgba(255,255,255,0.35)",
+              color: activeQuest === q.id ? q.color : "rgba(255,255,255,0.35)",
               cursor: "pointer",
-              fontSize: 10,
+              fontSize: 9,
               letterSpacing: 1.5,
               textTransform: "uppercase",
               fontFamily: "inherit",
               borderBottom:
-                activeType === t.id
-                  ? `2px solid ${t.color}`
+                activeQuest === q.id
+                  ? `2px solid ${q.color}`
                   : "2px solid transparent",
               transition: "all 0.2s",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: 2,
+              gap: 1,
             }}
           >
             <span
               style={{
-                fontSize: isDesktop ? 18 : 17,
-                height: 22,
+                fontSize: isDesktop ? 16 : 15,
+                height: 20,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              {t.emoji}
+              {q.emoji}
             </span>
-            {t.label}
+            {q.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── CATEGORY SUB-TABS ── */}
+      <div
+        style={{
+          display: "flex",
+          gap: 0,
+          background: "#0a0a14",
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          flexShrink: 0,
+          overflowX: "auto",
+        }}
+      >
+        {getCategoriesForQuest(activeQuest).map((c) => (
+          <button
+            key={c.id}
+            onClick={() => {
+              if (c.id === activeCategory) return;
+              setActiveCategory(c.id);
+              setSelectedVenue(null);
+              setSearchArea(null);
+              if (!isDesktop) setSheetState("peek");
+              if (venueCacheRef.current[c.id]) {
+                setVenues(venueCacheRef.current[c.id]);
+                setLoading(false);
+              } else {
+                setVenues([]);
+                setLoading(true);
+              }
+            }}
+            style={{
+              flex: 1,
+              padding: isDesktop ? "7px 4px" : "5px 4px",
+              background:
+                activeCategory === c.id ? "rgba(255,255,255,0.06)" : "transparent",
+              border: "none",
+              color: activeCategory === c.id ? c.color : "rgba(255,255,255,0.35)",
+              cursor: "pointer",
+              fontSize: 9,
+              letterSpacing: 1,
+              textTransform: "uppercase",
+              fontFamily: "inherit",
+              borderBottom:
+                activeCategory === c.id
+                  ? `2px solid ${c.color}`
+                  : "2px solid transparent",
+              transition: "all 0.2s",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 1,
+              whiteSpace: "nowrap",
+              minWidth: 0,
+            }}
+          >
+            <span
+              style={{
+                fontSize: isDesktop ? 15 : 14,
+                height: 18,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {c.emoji}
+            </span>
+            {c.label}
           </button>
         ))}
       </div>
@@ -769,7 +848,7 @@ export default function App() {
           style={{
             height: "100%",
             width: `${completionPct}%`,
-            background: `linear-gradient(90deg, ${VENUE_TYPES.find((t) => t.id === activeType)?.color}, #fff8)`,
+            background: `linear-gradient(90deg, ${CATEGORY_MAP[activeCategory]?.color || "#f59e0b"}, #fff8)`,
             transition: "width 0.5s ease",
             borderRadius: "0 2px 2px 0",
           }}
@@ -862,7 +941,7 @@ export default function App() {
               <div
                 style={{ fontSize: 40, animation: "spin 1s linear infinite" }}
               >
-                {VENUE_TYPES.find((t) => t.id === activeType)?.emoji || "🍺"}
+                {CATEGORY_MAP[activeCategory]?.emoji || "📍"}
               </div>
               <div
                 style={{

@@ -16,17 +16,17 @@
 import { useEffect, useRef } from "react";
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
-import { VENUE_TYPES } from "../constants";
+import { CATEGORY_MAP } from "../constants";
 import { distanceMiles } from "../utils/distance";
 
 export function venueIcon(venue, isSelected, isMobile = false) {
   const color = venue.visited
     ? "#22c55e"
-    : VENUE_TYPES.find((t) => t.id === venue.type)?.color || "#f59e0b";
+    : CATEGORY_MAP[venue.type]?.color || "#f59e0b";
   const size = isSelected ? (isMobile ? 34 : 20) : isMobile ? 23 : 14;
   return L.divIcon({
     className: "",
-    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid ${venue.visited ? "#22c55e" : "rgba(255,255,255,0.4)"};box-shadow:0 0 ${venue.visited ? "8px" : "4px"} ${color};cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;font-size:${size * 0.55}px">${venue.visited ? "✓" : VENUE_TYPES.find((t) => t.id === venue.type)?.emoji || "📍"}</div>`,
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid ${venue.visited ? "#22c55e" : "rgba(255,255,255,0.4)"};box-shadow:0 0 ${venue.visited ? "8px" : "4px"} ${color};cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;font-size:${size * 0.55}px">${venue.visited ? "✓" : CATEGORY_MAP[venue.type]?.emoji || "📍"}</div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });

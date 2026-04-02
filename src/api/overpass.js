@@ -2,13 +2,18 @@
  * overpass.js — OpenStreetMap venue fetching via Overpass API
  *
  * Free, no API key needed. Fetches real venue locations (name, address, coords)
- * within ~8km of a given lat/lng for a specific amenity type (bar, cafe, etc.).
+ * within a given radius of a lat/lng for a specific category.
+ *
+ * Each category declares its own OSM tag/value pair (e.g. amenity=bar,
+ * tourism=museum, leisure=park) via CATEGORY_MAP in constants.js.
  *
  * buildAddress() assembles a human-readable address from OSM's fragmented addr:* tags.
  * Returns " " (space) when no address info exists — this signals "no OSM address"
  * to the ghost venue filter (important: empty string would also work, but the space
  * is the existing convention).
  */
+
+import { CATEGORY_MAP } from "../constants";
 
 function buildAddress(tags) {
   const num = tags["addr:housenumber"] || "";
@@ -29,7 +34,20 @@ function buildAddress(tags) {
 }
 
 export async function fetchVenues(lat, lng, type, signal, radius = 4000) {
-  const query = `[out:json][timeout:10];nwr["amenity"="${type}"](around:${radius},${lat},${lng});out center body;`;
+  const cat = CATEGORY_MAP[type];
+  let query;
+  if (cat && Array.isArray(cat.osmValue)) {
+    // Union query for multiple values (e.g. park + garden + playground)
+    const parts = cat.osmValue.map(
+      (v) => `nwr["${cat.osmTag}"="${v}"](around:${radius},${lat},${lng})`,
+    );
+    query = `[out:json][timeout:25];(${parts.join(";")};);out center body;`;
+  } else {
+    const tagFilter = cat
+      ? `["${cat.osmTag}"="${cat.osmValue}"]${cat.osmExtraFilter || ""}`
+      : `["amenity"="${type}"]`;
+    query = `[out:json][timeout:25];nwr${tagFilter}(around:${radius},${lat},${lng});out center body;`;
+  }
 
   let res;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -39,7 +57,7 @@ export async function fetchVenues(lat, lng, type, signal, radius = 4000) {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       signal,
     });
-    if (res.status !== 429) break;
+    if (res.status !== 429 && res.status !== 504) break;
     await new Promise((r) => setTimeout(r, (attempt + 1) * 2000));
   }
 

@@ -15,6 +15,8 @@
  *   null      = API returned no match (don't re-fetch, venue doesn't exist there)
  */
 
+import { CATEGORY_MAP } from "../constants";
+
 export const CACHE_KEY = "cityquest_api_cache";
 export const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -44,6 +46,9 @@ export function filterGhostVenues(venues) {
   }
   const now = Date.now();
   return venues.filter((v) => {
+    // Skip ghost filtering for categories where Google coverage is poor
+    const cat = CATEGORY_MAP[v.type];
+    if (cat && cat.ghostFilter === false) return true;
     // If venue already has googleData in memory, use that
     if (v.googleData !== undefined) {
       if (v.googleData?.closed) return false;

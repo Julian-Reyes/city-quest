@@ -1,7 +1,7 @@
 # City Quest — Project Guide
 
 ## What This App Is
-A mobile-first PWA that gamifies exploring your city. Users discover bars, coffee shops, ice cream shops, and restaurants on a map, check in when they visit, and unlock achievements. Think Pokémon GO but for real-world venues.
+A mobile-first PWA that gamifies exploring your city. Users discover venues and points of interest — bars, museums, parks, theaters, and more — organized into Quest Types (game modes). Check in when you visit and unlock achievements. Think Pokémon GO but for real-world places.
 
 **Live at**: https://julianreyes.dev/city-quest/
 **Repo**: Julian-Reyes/city-quest
@@ -14,21 +14,23 @@ The app was originally a single-file `App.jsx` (~2000 lines) and has been split 
 See **File Structure** below for the full layout. Features:
 
 **UI & Navigation**
-- Header with venue type name, city edition subtitle, visited count, and completion percentage
-- City edition text (e.g. "— San Diego Edition") uses non-breaking spaces (`\u00A0`) so it stays as one unit — fits on line 1 with "Bar Hunter" if short, wraps entirely to line 2 if long
-- Venue type switcher (Bars 🍺 / Coffee ☕ / Ice Cream 🍦 / Food 🍔)
-- Animated progress bar showing % of venues visited
+- Header with quest name, city subtitle, visited count, and completion percentage
+- Header is a flex row: left side (`flex: 1, minWidth: 0`) has title/subtitle, right side (`flexShrink: 0`) has stats — prevents text overlapping stats
+- Quest-themed header: e.g. "🎨 Culture Run - Austin" uses `whiteSpace: "nowrap"` to stay as one unit
+- City name uses non-breaking spaces (`\u00A0`) so it stays as one unit — fits on line 1 if short, wraps entirely to line 2 if long
+- Two-tier navigation: Quest selector row (🍻 Night Out / ☀️ Day Explorer / 🎨 Culture Run / 🏃 Active) + category sub-tabs within the active quest
+- Animated progress bar showing % of venues visited (colored by active category)
 - Bottom nav with List / Awards / Passport tabs
 - Responsive layout: mobile (stacked) and desktop (two-column with sidebar)
 
 **Map View**
 - Leaflet map via `react-leaflet` with CartoDB dark tiles
-- Shows venue pins (amber = unvisited, green = visited) with user's blue location dot
+- Shows venue pins (category-colored = unvisited, green = visited) with user's blue location dot
 - "Search this area" button to load venues when panning to new areas
 - Geolocation requested on load
 
 **Real Venue Data (3 API sources)**
-- **Overpass API (OpenStreetMap)** — fetches real venue locations (name, address, coords) based on map viewport. Free, no key needed. Returns street-only addresses (e.g., "123 Main St"); city/state enrichment happens in App.jsx via Nominatim.
+- **Overpass API (OpenStreetMap)** — fetches real venue locations (name, address, coords) based on map viewport. Free, no key needed. Each category declares its own OSM tag/value (e.g. `amenity=bar`, `tourism=museum`). Supports union queries via array `osmValue` (e.g. `["park", "garden", "playground"]`). Returns street-only addresses (e.g., "123 Main St"); city/state enrichment happens in App.jsx via Nominatim.
 - **Foursquare Places API** — enriches venues with human-readable categories (e.g., "Cocktail Bar", "Dive Bar", "Speakeasy")
 - **Google Places API (New)** — enriches venues with rating, rating count, price level, and opening hours
 - All API data is fetched on venue click and cached on the venue object
@@ -63,11 +65,12 @@ See **File Structure** below for the full layout. Features:
 - Visited venues skip ghost detection (never "removed from map")
 
 **Achievements Panel**
-- 11 achievements in three sections:
-  - **Milestones** (global): First Sip (1), Night Owl (5), Bar Hopper (10), Local Legend (20), City Conqueror (50)
-  - **Categories** (per-type): Bar Fly (15 bars), Coffee Snob (10 cafes), Sweet Tooth (5 ice cream), Food Critic (15 restaurants)
+- Achievements in four sections:
+  - **Milestones** (global): First Discovery (1), Curious Wanderer (5), Explorer (10), Local Legend (20), City Conqueror (30)
+  - **Quest Progress**: Night Owl (10 night out), Daylight Explorer (10 day explorer), Art Aficionado (10 culture), Iron Legs (10 active)
+  - **Categories** (per-type): Bar Fly (5 bars), Coffee Snob (10 cafes), Sweet Tooth (5 ice cream), Food Critic (15 restaurants), Park Ranger (5 parks), History Buff (5 museums), Bookworm (5 libraries), Drama Fan (5 theatres), Night Rider (5 clubs), Pub Crawler (5 pubs), Trailblazer (3 trails), Water Bug (3 pools)
   - **Activity**: Photographer (10 photos), Chronicler (10 notes)
-- Each achievement has a `stat` key that maps to a field in the stats object (`total`, `bar`, `cafe`, `ice_cream`, `restaurant`, `photos`, `notes`)
+- Each achievement has a `stat` key that maps to a field in the stats object — stats are computed dynamically from category IDs and `quest_*` keys
 - Full-screen celebration animation when achievements are unlocked; multiple simultaneous unlocks queue and show sequentially (tap to advance)
 - Progress shown for locked achievements ("X more to go")
 - Unlock detection compares stats before/after check-in, so photo/note achievements trigger on repeat visits too
@@ -79,7 +82,7 @@ See **File Structure** below for the full layout. Features:
 - Photos stored in separate keys (`cityquest_photo_{venueId}_{index}`) to avoid hitting 5MB limit
 - Photos compressed via canvas before storage (800px max, JPEG 0.7 quality → ~100-200KB)
 - `visitsRef` in App.jsx parsed once on mount, hydrated into venues after ghost filter
-- `getVisitStats()` in visits.js computes `{total, bar, cafe, ice_cream, restaurant, photos, notes}` from stored data
+- `getVisitStats()` in visits.js dynamically computes `{total, photos, notes}` plus per-category counts (e.g. `bar`, `museum`, `park`) and per-quest counts (`quest_night_out`, `quest_culture_run`, etc.) from stored data using `CATEGORY_MAP`
 - `getVisitedVenues(type)` in visits.js reconstructs full venue objects from saved visits for a given type — used to inject visited venues into the map regardless of search area
 - `getAllVisitedVenues()` in visits.js returns all visited venues across all types (no lat/lng requirement) — used by Passport panel
 - `backfillVisitTypes(venues)` in visits.js patches old localStorage entries that lack `type`, `name`, or `lat`/`lng` fields using venue data; called after venue fetches to fix missing metadata
@@ -102,7 +105,7 @@ See **File Structure** below for the full layout. Features:
 ```
 src/
 ├── App.jsx                      — Main orchestration: all state, effects, JSX layout
-├── constants.js                 — VENUE_TYPES (type switcher), ACHIEVEMENTS (gamification)
+├── constants.js                 — QUEST_TYPES, VENUE_CATEGORIES, CATEGORY_MAP, ACHIEVEMENTS
 ├── api/
 │   ├── cache.js                 — localStorage cache (7-day TTL) + ghost venue filter
 │   ├── overpass.js              — OpenStreetMap venue fetching (free, no key)
@@ -134,7 +137,7 @@ All files use named exports; only App uses a default export.
 
 ### APIs
 
-1. **OpenStreetMap / Overpass API** — Free, no key needed. Fetches real venue locations based on map viewport. `buildAddress()` returns street-only addresses or `" "` (space) for venues with no OSM address tags.
+1. **OpenStreetMap / Overpass API** — Free, no key needed. Fetches real venue locations based on map viewport. Each category in `VENUE_CATEGORIES` declares `osmTag` and `osmValue` (e.g. `amenity=bar`, `tourism=museum`, `leisure=park`) plus optional `osmExtraFilter` for compound queries (e.g. `["sport"="climbing"]`). `buildAddress()` returns street-only addresses or `" "` (space) for venues with no OSM address tags. Query timeout is 25 seconds (increased from 10s because POI queries like parks and nature reserves return larger datasets). Retries up to 3 times on 429 (rate limit) and 504 (gateway timeout) with exponential backoff.
 
 2. **Nominatim Reverse Geocode** — Single call per `fetchCenter` change. Returns city name (for header) and builds an `areaSuffix` string (e.g., "Austin, TX") used to enrich OSM addresses. US state names are abbreviated via a `STATE_ABBREV` map in App.jsx. The `enrichAddress(address, suffix)` helper appends the suffix only to non-blank, comma-free addresses — blank/space addresses pass through unchanged so ghost filtering still works. Enrichment runs after `filterGhostVenues()`. A `useEffect` watching `areaSuffix` re-enriches existing venues when Nominatim resolves after the venue fetch.
 
@@ -164,7 +167,7 @@ Photos and reviews are commented out to save API costs. See `REIMPLEMENT_PHOTOS_
 - `undefined` = cache miss, `null` = API returned no match (important distinction)
 
 ### Ghost Venue Filtering
-OSM returns stale/extinct venues that don't correspond to real businesses. A venue is a **ghost** when Google returns `null` (no match or >300m distance rejection) or `{ closed: true }` (permanently closed). Any venue without a valid Google match is hidden — OSM address alone is not enough to keep a venue visible.
+OSM returns stale/extinct venues that don't correspond to real businesses. A venue is a **ghost** when Google returns `null` (no match or >300m distance rejection) or `{ closed: true }` (permanently closed). Any venue without a valid Google match is hidden — OSM address alone is not enough to keep a venue visible. Categories with `ghostFilter: false` (parks, monuments, nature reserves) skip ghost filtering since Google Places coverage is poor for these POI types.
 
 **Rejection rules (google.js):**
 - **Distance gate:** If Google's best text match is >300m from the OSM coordinates, the entire result is rejected (returns `null`). Prevents showing data from a different business with a similar name.
@@ -239,7 +242,16 @@ OSM returns stale/extinct venues that don't correspond to real businesses. A ven
 Check-ins persist to localStorage via `src/api/visits.js` and `src/utils/photo.js`. Venues hydrated from storage on mount, support repeat check-ins with visit count display. See **Persistence** section above for details.
 
 ### 2. Per-Category & Activity Achievements — DONE
-Category-specific milestones (Bar Fly, Coffee Snob, Sweet Tooth, Food Critic) and activity achievements (Photographer, Chronicler) implemented alongside global milestones. Achievements panel now renders in three sections. Visit data stores `venueType` for per-category counting. See **Achievements Panel** section above for full list.
+Category-specific milestones, quest-level achievements, and activity achievements (Photographer, Chronicler) implemented alongside global milestones. Achievements panel now renders in four sections (Milestones, Quest Progress, Categories, Activity). Visit data stores `venueType` for per-category and per-quest counting. See **Achievements Panel** section above for full list.
+
+### Quest Types & POI Expansion — DONE
+App expanded from 4 venue types to 19 categories across 4 quest types:
+- **☀️ Day Explorer**: park (includes gardens & playgrounds), cafe (includes bakeries), ice_cream, viewpoint, beach
+- **🎨 Culture Run**: museum, gallery, theatre, library, monument
+- **🏃 Active**: nature_reserve, swimming_pool, skatepark, climbing
+- **🍻 Night Out**: bar, nightclub, pub, restaurant
+
+Two-tier navigation: quest selector row + category sub-tabs. Each category declares its own OSM tag mapping in `VENUE_CATEGORIES` — supports single values (`osmValue: "bar"`) or arrays for union queries (`osmValue: ["park", "garden", "playground"]`). Quest-themed header (e.g. "🎨 Culture Run - Austin"). `getVisitStats()` now dynamically computes per-category and per-quest stats. Ghost filtering disabled for POI categories with poor Google Places coverage (`ghostFilter: false`). Overpass query timeout is 25s with retry on both 429 and 504.
 
 ### 3. Gamification Ideas (not yet implemented)
 

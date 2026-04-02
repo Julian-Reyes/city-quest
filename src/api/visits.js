@@ -11,6 +11,8 @@
  * to keep the main visits object small and avoid hitting the 5MB limit.
  */
 
+import { CATEGORY_MAP } from "../constants";
+
 const VISITS_KEY = "cityquest_visited";
 
 export function getVisits() {
@@ -148,11 +150,20 @@ export function getAllVisitedVenues() {
 
 export function getVisitStats() {
   const data = getVisits();
-  const stats = { total: 0, bar: 0, cafe: 0, ice_cream: 0, restaurant: 0, photos: 0, notes: 0 };
+  const stats = { total: 0, photos: 0, notes: 0 };
   for (const entry of Object.values(data)) {
     if (!entry.visits || entry.visits.length === 0) continue;
     stats.total++;
-    if (entry.type && stats[entry.type] !== undefined) stats[entry.type]++;
+    // Dynamic per-category counting
+    if (entry.type) {
+      stats[entry.type] = (stats[entry.type] || 0) + 1;
+    }
+    // Dynamic per-quest counting
+    const cat = CATEGORY_MAP[entry.type];
+    if (cat) {
+      const questKey = `quest_${cat.quest}`;
+      stats[questKey] = (stats[questKey] || 0) + 1;
+    }
     for (const v of entry.visits) {
       if (v.hasPhoto) stats.photos++;
       if (v.note) stats.notes++;

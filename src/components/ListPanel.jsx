@@ -8,7 +8,7 @@
  * on mobile it's hidden because the BottomSheet's drag label already shows it.
  */
 
-import { VENUE_TYPES } from "../constants";
+import { CATEGORY_MAP } from "../constants";
 import { distanceMiles } from "../utils/distance";
 
 export function ListPanel({
@@ -73,7 +73,7 @@ export function ListPanel({
               flexShrink: 0,
             }}
           >
-            {v.visited ? "✅" : VENUE_TYPES.find((t) => t.id === v.type)?.emoji}
+            {v.visited ? "✅" : CATEGORY_MAP[v.type]?.emoji}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div

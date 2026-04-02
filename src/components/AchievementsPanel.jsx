@@ -16,6 +16,7 @@ import { ACHIEVEMENTS } from "../constants";
 
 const SECTIONS = [
   { key: "global", label: "Milestones" },
+  { key: "quest", label: "Quest Progress" },
   { key: "category", label: "Categories" },
   { key: "activity", label: "Activity" },
 ];
