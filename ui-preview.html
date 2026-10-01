@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f3ed">
-  <title>City Quest · UI playground</title>
+  <title>City Quest · Connected UI preview</title>
   <style>
-    /* Standalone design playground. Nothing here is imported by the main app. */
+    /* Preview-only shell. Shared data and components are imported below. */
     :root { --bg:#f5f3ed; --surface:#fffef9; --ink:#243c32; --muted:#79847a; --line:#e2e5db; --accent:#e96b44; --soft:#edf0e5; --shadow:0 12px 40px #243c3210; }
     * { box-sizing:border-box; }
     body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
@@ -92,7 +92,7 @@
     body.dark .venue-tag { color:#a2c3a7; }
     @media(min-width:1500px) { .workspace { height:660px; } }
     @media(max-width:1000px) { header { padding:0 22px; } main { padding:14px 22px 22px; } .workspace { grid-template-columns:minmax(0,1fr) 300px; gap:16px; } .location { margin-left:14px; padding-left:14px; } .detail { width:245px; } .quest { padding:10px 14px; } }
-    @media(max-width:700px) {
+    @media(max-width:767px) {
       header { height:72px; padding:0 18px; } .brand-name { font-size:21px; } .brand-mark { width:33px; height:33px; } .location,.avatar { display:none; }
       .preview { font-size:9px; padding:5px 10px; } .header-actions { gap:0; } .theme-toggle { padding:6px 11px; font-size:10px; }
       .quests { justify-content:start; overflow:auto; padding:14px 16px 8px; gap:5px; scrollbar-width:none; } .quest { padding:9px 12px; font-size:11px; } .quest .emoji { font-size:17px; margin-right:5px; }
@@ -101,92 +101,771 @@
       .map-top { top:14px; left:14px; right:14px; } .map-label { padding:7px 10px; font-size:10px; } .search-area { padding:8px 11px; font-size:10px; } .detail { left:14px; bottom:14px; width:245px; padding:14px; } .detail h2 { font-size:15px; } .detail p { margin-bottom:10px; } .map-controls { right:14px; bottom:48px; } .footer { font-size:9px; } .footer span:last-child { display:none; }
     }
     @media(prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; } }
+
+    /* Connected preview overrides. All production components remain unchanged. */
+    .live-workspace { height:660px; }
+    .live-map .leaflet-container { font:inherit; z-index:0; background:var(--soft)!important; }
+    .live-map .leaflet-control-attribution svg { width:12px; height:8px; display:inline; }
+    .live-map .map-top { z-index:500; pointer-events:none; }
+    .live-map .map-top button { pointer-events:auto; }
+    .live-map .map-controls { z-index:500; bottom:40px; right:16px; }
+    .map-controls button:disabled,.search-area:disabled { opacity:.5; cursor:default; }
+    .sidebar { overflow:hidden; }
+    .tabs { flex-shrink:0; }
+    .tab { padding:7px 4px; white-space:nowrap; }
+    .venue-list { flex:1; min-height:0; }
+    .live-detail { color:var(--ink); max-height:350px; overflow:auto; flex-shrink:0; margin-bottom:14px; }
+    .live-detail [style*="color: rgba(255"] { color:var(--muted)!important; }
+    .live-detail button[style*="color: rgb(255"] { color:var(--ink)!important; }
+    .live-detail > div > div { background:var(--surface)!important; border-color:var(--line)!important; }
+    .visit-history { padding:10px 14px; border:1px solid var(--line); border-radius:12px; background:var(--surface); font-size:11px; }
+    .visit-history summary { cursor:pointer; }
+    .visit-history > div { border-top:1px solid var(--line); padding:12px 0; }
+    .visit-history img { max-width:100%; max-height:180px; border-radius:8px; }
+    .collection-workspace { grid-template-columns:minmax(0,1fr) 440px; }
+    .collection-content { min-height:0; overflow:auto; flex:1; }
+    .legacy-panel { color:#f0eee5; background:#17231f; border-radius:16px; min-height:300px; }
+    .scope-note { font-size:11px; color:var(--muted); }
+    .collection-workspace:has(.quest-overview), .collection-workspace:has(.legacy-panel):not(:has(.passport-panel)) { display:block; }
+    .collection-workspace:has(.quest-overview) .sidebar,.collection-workspace:has(.legacy-panel):not(:has(.passport-panel)) .sidebar { height:100%; max-width:1000px; margin:auto; }
+    .quest-overview .venue-card { align-items:center; }
+    .location-notice { padding:10px 14px; border:1px solid var(--line); border-radius:12px; margin-bottom:16px; font-size:12px; }
+    .modal-backdrop { position:fixed; inset:0; z-index:1000; background:#10201caa; backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; padding:20px; }
+    .checkin-dialog { width:100%; max-width:440px; max-height:90dvh; overflow:auto; padding:24px; border-radius:20px; background:var(--surface); box-shadow:var(--shadow); }
+    .checkin-dialog h2 { font:24px/1.2 Georgia,serif; margin:8px 0 20px; }
+    .checkin-dialog label { display:block; font-size:12px; margin-bottom:6px; }
+    .checkin-dialog textarea { width:100%; min-height:100px; resize:vertical; border:1px solid var(--line); border-radius:10px; background:var(--bg); color:var(--ink); padding:12px; font:inherit; }
+    .photo-actions { display:flex; gap:8px; margin:14px 0; }
+    .photo-preview img { max-width:100%; max-height:200px; border-radius:10px; display:block; margin-bottom:10px; }
+    .photo-preview { margin-bottom:14px; }
+    .cancel-checkin { display:block; width:100%; margin-top:8px; padding:8px; color:var(--muted); }
+    button:disabled { cursor:default; opacity:.6; }
+    .achievement-unlock { text-align:center; }
+    .achievement-emoji { font-size:70px; }
+    .toast { pointer-events:none; z-index:2000; max-width:calc(100vw - 32px); text-align:center; }
+    @media(max-width:767px) {
+      .live-workspace { height:auto; }
+      .sidebar { overflow:visible; }
+      .live-detail { order:3; max-height:none; margin-bottom:0; }
+      .live-map { height:380px; }
+      .live-map .live-detail { position:absolute; left:12px; right:12px; bottom:12px; max-height:65%; z-index:550; margin:0; border-radius:16px; background:var(--surface); box-shadow:var(--shadow); }
+      .live-map:has(.live-detail) .map-controls { bottom:auto; top:64px; }
+      .collection-content { order:3; overflow:visible; }
+      .collection-workspace { display:flex; }
+      .collection-workspace:has(.quest-overview),.collection-workspace:has(.legacy-panel):not(:has(.passport-panel)) { display:flex; }
+      .collection-workspace:has(.quest-overview) .sidebar,.collection-workspace:has(.legacy-panel):not(:has(.passport-panel)) .sidebar { display:contents; }
+      .modal-backdrop { align-items:flex-end; padding:0; }
+      .checkin-dialog { max-width:none; border-radius:20px 20px 0 0; padding-bottom:calc(24px + env(safe-area-inset-bottom)); }
+      .tabs { position:sticky; top:0; z-index:600; background:var(--soft); }
+    }
   </style>
 </head>
 <body>
-  <div class="preview">DESIGN PLAYGROUND <span>· Sample venues · Your real check-ins are untouched</span></div>
-  <div class="app">
-    <header>
-      <div class="brand"><div class="brand-mark" aria-hidden="true">↗</div><div class="brand-name">city<span>quest</span></div><div class="location">EXPLORING<strong>Uberlândia, Brazil ↘</strong></div></div>
-      <div class="header-actions"><button class="theme-toggle" id="theme-toggle" aria-pressed="false">◐ Dark mode</button><div class="avatar" aria-label="Sample profile">JR</div></div>
-    </header>
-    <nav class="quests" aria-label="Quest types" id="quests"></nav>
-    <main>
-      <div class="intro"><div><div class="eyebrow">A little closer. A little more curious.</div><h1 id="headline">Find your next favorite.</h1><p id="subtitle">Good coffee, great food, and somewhere worth stopping.</p></div><div class="journey"><span class="journey-icon">✧</span><div><strong id="progress">0 places discovered</strong><small>Your story starts around the corner.</small></div></div></div>
-      <div class="workspace">
-        <aside class="sidebar" aria-label="Venue browser">
-          <nav class="tabs" aria-label="View"><button class="tab active" data-view="explore" aria-pressed="true">↗ Explore</button><button class="tab" data-view="passport" aria-pressed="false">▧ Passport</button></nav>
-          <nav class="categories" aria-label="Venue categories" id="categories"></nav>
-          <div class="list-heading"><strong id="list-title">A few places to start</strong><span id="result-count"></span></div>
-          <div class="venue-list" id="venue-list"></div>
-        </aside>
-        <section class="map" aria-label="Illustrated sample map, not a geographic map">
-          <svg viewBox="0 0 900 640" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-            <defs><pattern id="blocks" width="120" height="100" patternTransform="rotate(-24)" patternUnits="userSpaceOnUse"><rect width="120" height="100" fill="#e8e9dc"/><rect x="10" y="10" width="100" height="80" rx="7" fill="#dcded0"/><path d="M120 0H0V100" fill="none" stroke="#fffdf3" stroke-width="9"/></pattern></defs>
-            <g class="map-grid" id="map-grid"><rect x="-900" y="-640" width="2700" height="1920" fill="url(#blocks)"/><path d="M640 -100C510 70 670 190 620 280S510 420 595 760" fill="none" stroke="#bfcfb9" stroke-width="120"/><path d="M640 -100C510 70 670 190 620 280S510 420 595 760" fill="none" stroke="#b3ced0" stroke-width="35"/><path d="M-100 490L980 28M145 -90L485 740M-90 200L940 430" stroke="#cdcbbb" stroke-width="25" fill="none"/><path d="M-100 490L980 28M145 -90L485 740M-90 200L940 430" stroke="#fffdf3" stroke-width="20" fill="none"/><path d="M-100 490L980 28" stroke="#ecd3ac" stroke-width="9"/><path d="M710 110l135 62-50 112-100-22-27-70zM95 30l140 40-55 100-115-20zM80 480l110 20 55 100-160 30z" fill="#b9c8a8"/><g fill="#95aa86"><circle cx="725" cy="180" r="14"/><circle cx="750" cy="200" r="11"/><circle cx="780" cy="185" r="16"/><circle cx="130" cy="100" r="12"/><circle cx="151" cy="120" r="10"/><circle cx="130" cy="550" r="17"/></g><g fill="#8a9380" font-family="sans-serif" font-size="12" letter-spacing="3"><text x="300" y="230">CENTRO</text><text x="145" y="420" transform="rotate(-24 145 420)" font-size="10" letter-spacing="1">Avenida Afonso Pena</text><text x="682" y="337">SANTA MÔNICA</text><text x="80" y="340">MARTINS</text><text x="680" y="240" font-size="9" letter-spacing="1">A little green space</text></g></g>
-          </svg>
-          <div class="pin-layer" id="pins"></div><div class="user-dot" aria-label="Sample location"></div>
-          <div class="map-top"><div class="map-label">⌖ Uberlândia <span style="opacity:.5">/ sample area</span></div><button class="search-area" id="search-area">↻ Search this area</button></div>
-          <div class="map-controls"><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-out" aria-label="Zoom out">−</button><button id="recenter" aria-label="Recenter map">⌖</button></div>
-          <div class="detail" id="detail" hidden></div><div class="map-credit">Illustrated map · design preview</div>
-        </section>
-      </div>
-      <div class="footer"><span><strong>Take the scenic route.</strong> The best discoveries aren't always planned.</span><span>City Quest / a field guide to your city</span></div>
-    </main>
-  </div>
-  <div class="toast" id="toast" role="status" hidden></div>
-  <script>
-    // Sample data and in-memory interactions only: no APIs, geolocation or storage.
-    const quests = [
-      { id:'food', label:'Food & Drink', emoji:'🍕 🍻', categories:[['bar','Bar','🍺'],['cafe','Cafe','☕'],['ice','Ice Cream','🍦'],['restaurant','Restaurant','🍽️']], headline:'Find your next favorite.', subtitle:'Good coffee, great food, and somewhere worth stopping.' },
-      { id:'day', label:'Day Explorer', emoji:'☀️', categories:[['park','Park','🌳'],['view','Viewpoint','🌄'],['beach','Beach','🏖️']], headline:'A good day to get lost.', subtitle:'Fresh air, quiet corners, and a different way home.' },
-      { id:'culture', label:'Culture Run', emoji:'🎨', categories:[['museum','Museum','🏛️'],['gallery','Gallery','🖼️'],['theatre','Theatre','🎭'],['library','Library','📚'],['landmark','Landmark','🗿']], headline:'Follow your curiosity.', subtitle:'New perspectives, old stories, and a little inspiration.' },
-      { id:'active', label:'Active', emoji:'🏃', categories:[['trail','Trail','🥾'],['swim','Swimming','🏊'],['skate','Skate','🛹'],['climb','Climbing','🧗']], headline:'Go a little further.', subtitle:'Move your body. Clear your head. Find your own pace.' }
-    ];
-    const examples = {
-      cafe:[['Café do Pátio','Coffee & a quiet courtyard','0.3 km','Outdoor seating','#e7dcc9'],['Grão & Prosa','Specialty coffee · small bites','0.6 km','A local favorite','#d8e0ca'],['Casa de Café','Coffee shop · fresh pastries','0.9 km','Something sweet','#e8d3c6'],['O Pequeno Espresso','A little coffee, a little pause','1.2 km','Cozy corner','#d8dfe3']],
-      bar:[['Bar da Esquina','Cold drinks · good company','0.4 km','Neighborhood spot','#e7d5c0'],['Pátio Cervejeiro','Craft beer · open courtyard','0.8 km','Outdoor seating','#d9e0cd'],['Última Rodada','Music · cocktails · late nights','1.1 km','Stay a little longer','#dfd2df']],
-      ice:[['Gelato da Praça','Small batches · big scoops','0.2 km','Made with care','#ebd5d0'],['Doce Domingo','Ice cream · sunny afternoons','0.7 km','Something sweet','#e5dfbe']],
-      restaurant:[['Mesa & Jardim','Seasonal plates · garden tables','0.5 km','Slow down here','#d5dfc7'],['Forno da Vila','Wood-fired pizza · neighborhood kitchen','0.8 km','Share a slice','#e8d3c3'],['Casa do Sabor','Brazilian favorites · warm welcome','1.3 km','A local favorite','#e1dbc8']],
-      park:[['Um Jardim no Caminho','Green space · shady paths','0.5 km','Fresh air','#cfdec1'],['Parque do Bairro','A little escape from the city','1.0 km','Take a walk','#d8e2cb']]
-    };
-    let activeQuest='food', activeCategory='cafe', view='explore', selected=null, zoom=1, toastTimer;
-    const visited = new Set();
-    const allVenues = quests.flatMap(q=>q.categories.flatMap(([category,label,emoji]) => (examples[category] || [[`A little ${label.toLowerCase()} discovery`,'A sample place to explore','0.7 km','Worth a detour','#dce1d0'],[`Another ${label.toLowerCase()} to try`,'Somewhere new around the corner','1.2 km','Follow your curiosity','#e5d9ca']]).map((row,i)=>({id:`${category}-${i}`,category,emoji,name:row[0],description:row[1],distance:row[2],tag:row[3],color:row[4],x:[42,66,30,74][i],y:[39,46,65,69][i]}))));
-    const byId = id => allVenues.find(v=>v.id===id);
-    const $ = id => document.getElementById(id);
-    function notify(message) { $('toast').textContent=message; $('toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('toast').hidden=true,2600); }
-    function render() {
-      const quest=quests.find(q=>q.id===activeQuest);
-      $('quests').innerHTML=quests.map(q=>`<button class="quest ${q.id===activeQuest?'active':''}" data-quest="${q.id}" aria-pressed="${q.id===activeQuest}"><span class="emoji">${q.emoji}</span>${q.label}</button>`).join('');
-      $('categories').innerHTML=quest.categories.map(([id,label,emoji])=>`<button class="category ${id===activeCategory?'active':''}" data-category="${id}" aria-pressed="${id===activeCategory}">${emoji} ${label}</button>`).join('');
-      $('categories').hidden=view==='passport';
-      $('headline').textContent=view==='passport'?'Every place has a story.':quest.headline;
-      $('subtitle').textContent=view==='passport'?'A little collection of places you made your own.':quest.subtitle;
-      const venues=allVenues.filter(v=>view==='passport'?visited.has(v.id):v.category===activeCategory);
-      if(selected && !venues.some(v=>v.id===selected)) selected=null;
-      $('list-title').textContent=view==='passport'?'Your discoveries':'A few places to start';
-      $('result-count').textContent=`${venues.length} ${venues.length===1?'place':'places'}`;
-      $('progress').textContent=`${visited.size} ${visited.size===1?'place':'places'} discovered`;
-      $('venue-list').innerHTML=venues.length?venues.map(v=>`<button class="venue-card ${selected===v.id?'selected':''}" data-venue="${v.id}" aria-pressed="${selected===v.id}"><span class="venue-art" style="--art:${v.color}">${v.emoji}</span><span class="venue-copy"><h3>${v.name}</h3><p>${v.description}</p><span class="venue-meta"><span class="venue-tag">${visited.has(v.id)?'✓ Discovered':v.tag}</span><span>↗ ${v.distance}</span></span></span></button>`).join(''):'<div class="empty">Your passport is a blank page.<br>Pick a place in Explore and check in to start.</div>';
-      $('pins').innerHTML=venues.map(v=>`<button class="pin ${selected===v.id?'selected':''}" data-venue="${v.id}" style="left:${v.x}%;top:${v.y}%" aria-label="${v.name}" aria-pressed="${selected===v.id}">${visited.has(v.id)?'✓':v.emoji}</button>`).join('');
-      document.querySelectorAll('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-pressed',b.dataset.view===view);});
-      const venue=byId(selected); $('detail').hidden=!venue;
-      if(venue) $('detail').innerHTML=`<div class="detail-top"><div><div class="eyebrow">${visited.has(venue.id)?'One for your story':'Make a little discovery'}</div><h2>${venue.name}</h2></div><button class="close-detail" id="close-detail" aria-label="Close venue">×</button></div><p>${venue.description} · ${venue.distance} away</p><button class="checkin" id="checkin" ${visited.has(venue.id)?'disabled':''}>${visited.has(venue.id)?'✓ Added to your passport':'＋ Check in here'}</button>`;
+  <div id="preview-root"></div>
+  <noscript>Enable JavaScript to explore City Quest.</noscript>
+  <!-- Preview-only orchestration uses the working site data modules and components.
+       Open through Vite or the built site; ES module imports require a server. -->
+  <script type="module">
+import { createRoot } from "react-dom/client";
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
+import L from "leaflet";
+function venueIcon(venue, isSelected, isMobile = false) {
+  const color = venue.visited ? "#22c55e" : CATEGORY_MAP[venue.type]?.color || "#f59e0b";
+  const size = isSelected ? isMobile ? 34 : 20 : isMobile ? 23 : 14;
+  return L.divIcon({
+    className: "",
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid ${venue.visited ? "#22c55e" : "rgba(255,255,255,0.4)"};box-shadow:0 0 ${venue.visited ? "8px" : "4px"} ${color};cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;font-size:${size * 0.55}px">${venue.visited ? "\u2713" : CATEGORY_MAP[venue.type]?.emoji || "\u{1F4CD}"}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2]
+  });
+}
+function userIcon(isMobile = false) {
+  const size = isMobile ? 24 : 16;
+  return L.divIcon({
+    className: "",
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 0 0 4px rgba(59,130,246,0.3)"></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2]
+  });
+}
+function RecenterMap({ center, selectedVenue }) {
+  const map = useMap();
+  const hasInitialized = useRef(false);
+  useEffect(() => {
+    if (center && !hasInitialized.current) {
+      hasInitialized.current = true;
+      map.setView([center.lat, center.lng], map.getZoom());
     }
-    document.addEventListener('click',event=>{
-      const button=event.target.closest('button'); if(!button)return;
-      if(button.dataset.quest){activeQuest=button.dataset.quest;activeCategory=quests.find(q=>q.id===activeQuest).categories[0][0];selected=null;view='explore';render();}
-      else if(button.dataset.category){activeCategory=button.dataset.category;selected=null;render();}
-      else if(button.dataset.view){view=button.dataset.view;selected=null;render();}
-      else if(button.dataset.venue){selected=button.dataset.venue;render();}
-      else if(button.id==='close-detail'){selected=null;render();}
-      else if(button.id==='checkin'){visited.add(selected);render();notify('A new place, a new story. Added to your sample passport.');}
-      else if(button.id==='theme-toggle'){const dark=document.body.classList.toggle('dark');button.textContent=dark?'◐ Light mode':'◐ Dark mode';button.setAttribute('aria-pressed',dark);document.querySelector('meta[name="theme-color"]').content=dark?'#17231f':'#f5f3ed';}
-      else if(button.id==='search-area'){notify('Sample area refreshed. This preview uses illustrated venues.');}
-      else if(['zoom-in','zoom-out','recenter'].includes(button.id)){zoom=button.id==='recenter'?1:Math.max(.8,Math.min(1.8,zoom+(button.id==='zoom-in'?.2:-.2)));$('map-grid').style.transform=`scale(${zoom})`;$('pins').style.transform=`scale(${zoom})`;}
+  }, [center]);
+  useEffect(() => {
+    if (selectedVenue) {
+      map.setView([selectedVenue.lat, selectedVenue.lng], map.getZoom());
+    }
+  }, [selectedVenue]);
+  return null;
+}
+function MapMoveDetector({ fetchCenter, fetchZoom, onSearchArea }) {
+  const map = useMapEvents({
+    moveend: () => {
+      if (!fetchCenter) return;
+      const center = map.getCenter();
+      const zoom = map.getZoom();
+      const dist = distanceMiles(
+        fetchCenter.lat,
+        fetchCenter.lng,
+        center.lat,
+        center.lng
+      );
+      const bounds = map.getBounds();
+      const edgeLat = bounds.getNorth();
+      const R = 6371e3;
+      const dLat = (edgeLat - center.lat) * Math.PI / 180;
+      const visibleRadius = Math.round(R * Math.abs(dLat));
+      if (zoom >= 12 && (dist > 1 || zoom < fetchZoom)) {
+        onSearchArea({ lat: center.lat, lng: center.lng, zoom, radius: visibleRadius });
+      } else {
+        onSearchArea(null);
+      }
+    }
+  });
+  return null;
+}
+function PreviewMap({
+  venues,
+  userLocation,
+  onVenueClick,
+  selectedVenue,
+  fetchCenter,
+  fetchZoom,
+  onSearchArea,
+  isMobile,
+  dark
+}) {
+  const center = userLocation || fetchCenter || { lat: 37.7749, lng: -122.4194 };
+  return /* @__PURE__ */ React.createElement(
+    MapContainer,
+    {
+      center: [center.lat, center.lng],
+      zoom: 14,
+      zoomControl: false,
+      style: { width: "100%", height: "100%", background: "#1a1a2e" }
+    },
+    /* @__PURE__ */ React.createElement(
+      TileLayer,
+      {
+        url: dark ? "https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png" : "https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png",
+        attribution: '\xA9 <a href="https://stadiamaps.com/">Stadia Maps</a> \xA9 <a href="https://openmaptiles.org/">OpenMapTiles</a> \xA9 <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19
+      }
+    ),
+    /* @__PURE__ */ React.createElement(PreviewMapControls, { userLocation }),
+    /* @__PURE__ */ React.createElement(RecenterMap, { center: userLocation || fetchCenter, selectedVenue }),
+    /* @__PURE__ */ React.createElement(MapMoveDetector, { fetchCenter, fetchZoom, onSearchArea }),
+    venues.map((venue) => /* @__PURE__ */ React.createElement(
+      Marker,
+      {
+        key: venue.id,
+        position: [venue.lat, venue.lng],
+        icon: venueIcon(venue, selectedVenue?.id === venue.id, isMobile),
+        eventHandlers: { click: () => onVenueClick(venue) }
+      }
+    )),
+    userLocation && /* @__PURE__ */ React.createElement(
+      Marker,
+      {
+        position: [userLocation.lat, userLocation.lng],
+        icon: userIcon(isMobile)
+      }
+    )
+  );
+}
+function PreviewMapControls({ userLocation }) {
+  const map = useMap();
+  const controlsRef = useRef(null);
+  useEffect(() => {
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(map.getContainer());
+    L.DomEvent.disableClickPropagation(controlsRef.current);
+    L.DomEvent.disableScrollPropagation(controlsRef.current);
+    return () => observer.disconnect();
+  }, [map]);
+  return /* @__PURE__ */ React.createElement("div", { className: "map-controls", ref: controlsRef }, /* @__PURE__ */ React.createElement("button", { id: "zoom-in", "aria-label": "Zoom in", onClick: () => map.zoomIn() }, "+"), /* @__PURE__ */ React.createElement("button", { id: "zoom-out", "aria-label": "Zoom out", onClick: () => map.zoomOut() }, "\u2212"), /* @__PURE__ */ React.createElement("button", { id: "recenter", "aria-label": "Recenter on your location", disabled: !userLocation, onClick: () => {
+    if (userLocation) map.setView([userLocation.lat, userLocation.lng], 14);
+  } }, "\u2316"));
+}
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import "leaflet/dist/leaflet.css";
+import {
+  QUEST_TYPES,
+  CATEGORY_MAP,
+  getCategoriesForQuest,
+  ACHIEVEMENTS
+} from "/src/constants";
+import { getApiCache, setApiCache, filterGhostVenues } from "/src/api/cache";
+import { fetchVenues } from "/src/api/overpass";
+import { fetchFoursquareDetails } from "/src/api/foursquare";
+import { fetchGooglePlaceDetails } from "/src/api/google";
+import {
+  getVisits,
+  addVisit,
+  getVisitPhoto,
+  getVisitStats,
+  getVisitedVenues,
+  getAllVisitedVenues,
+  backfillVisitTypes
+} from "/src/api/visits";
+import { resizePhoto } from "/src/utils/photo";
+import { distanceMiles } from "/src/utils/distance";
+import { useIsDesktop } from "/src/hooks/useIsDesktop";
+import { VenueCard } from "/src/components/VenueCard";
+import { AchievementsPanel } from "/src/components/AchievementsPanel";
+import { PassportPanel } from "/src/components/PassportPanel";
+import { CameraOverlay } from "/src/components/CameraOverlay";
+const STATE_ABBREV = {
+  Alabama: "AL",
+  Alaska: "AK",
+  Arizona: "AZ",
+  Arkansas: "AR",
+  California: "CA",
+  Colorado: "CO",
+  Connecticut: "CT",
+  Delaware: "DE",
+  Florida: "FL",
+  Georgia: "GA",
+  Hawaii: "HI",
+  Idaho: "ID",
+  Illinois: "IL",
+  Indiana: "IN",
+  Iowa: "IA",
+  Kansas: "KS",
+  Kentucky: "KY",
+  Louisiana: "LA",
+  Maine: "ME",
+  Maryland: "MD",
+  Massachusetts: "MA",
+  Michigan: "MI",
+  Minnesota: "MN",
+  Mississippi: "MS",
+  Missouri: "MO",
+  Montana: "MT",
+  Nebraska: "NE",
+  Nevada: "NV",
+  "New Hampshire": "NH",
+  "New Jersey": "NJ",
+  "New Mexico": "NM",
+  "New York": "NY",
+  "North Carolina": "NC",
+  "North Dakota": "ND",
+  Ohio: "OH",
+  Oklahoma: "OK",
+  Oregon: "OR",
+  Pennsylvania: "PA",
+  "Rhode Island": "RI",
+  "South Carolina": "SC",
+  "South Dakota": "SD",
+  Tennessee: "TN",
+  Texas: "TX",
+  Utah: "UT",
+  Vermont: "VT",
+  Virginia: "VA",
+  Washington: "WA",
+  "West Virginia": "WV",
+  Wisconsin: "WI",
+  Wyoming: "WY",
+  "District of Columbia": "DC"
+};
+function enrichAddress(address, suffix) {
+  if (!address || address.trim() === "" || !suffix) return address;
+  if (address.includes(",")) return address;
+  return `${address}, ${suffix}`;
+}
+function PreviewApp() {
+  const isDesktop = useIsDesktop();
+  const [activeQuest, setActiveQuest] = useState("food_drink");
+  const [activeCategory, setActiveCategory] = useState("cafe");
+  const [venues, setVenues] = useState([]);
+  const [userLocation, setUserLocation] = useState(null);
+  const [fetchCenter, setFetchCenter] = useState(null);
+  const [selectedVenue, setSelectedVenue] = useState(null);
+  const [panel, setPanel] = useState("list");
+  const [loading, setLoading] = useState(true);
+  const [searchError, setSearchError] = useState(null);
+  const [searchRetry, setSearchRetry] = useState(0);
+  const [checkinModal, setCheckinModal] = useState(false);
+  const [note, setNote] = useState("");
+  const [photo, setPhoto] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [achievementQueue, setAchievementQueue] = useState([]);
+  const [searchArea, setSearchArea] = useState(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [fsqLoading, setFsqLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const fileInputRef = useRef(null);
+  const venueCacheRef = useRef({});
+  const completedSearchRef = useRef({});
+  const visitsRef = useRef(getVisits());
+  const [visitStats, setVisitStats] = useState(() => getVisitStats());
+  const hydrateVisits = useCallback((venues2) => {
+    const saved = visitsRef.current;
+    return venues2.map((v) => {
+      const sv = saved[v.id];
+      if (!sv || sv.visits.length === 0) return v;
+      const latest = sv.visits[sv.visits.length - 1];
+      const latestPhoto = latest.hasPhoto ? getVisitPhoto(v.id, sv.visits.length - 1) : null;
+      return {
+        ...v,
+        visited: true,
+        visitCount: sv.visits.length,
+        visits: sv.visits,
+        latestVisit: latest,
+        visitedAt: latest.at,
+        note: latest.note || "",
+        photo: latestPhoto
+      };
     });
-    render();
+  }, []);
+  const visitedCount = visitStats.total;
+  const typeVenues = useMemo(() => {
+    const filtered = venues.filter((v) => {
+      if (v.type !== activeCategory) return false;
+      if (!fetchCenter || !Number.isFinite(v.lat) || !Number.isFinite(v.lng))
+        return false;
+      const distance = distanceMiles(fetchCenter.lat, fetchCenter.lng, v.lat, v.lng);
+      if (distance * 1609.344 > (fetchCenter.radius ?? 4e3)) return false;
+      if (v.googleData?.closed) return false;
+      if (v.googleData === null && (!v.address || v.address.trim() === ""))
+        return false;
+      return true;
+    });
+    if (!userLocation) return filtered;
+    const { lat, lng } = userLocation;
+    return filtered.sort(
+      (a, b) => (a.lat - lat) ** 2 + (a.lng - lng) ** 2 - ((b.lat - lat) ** 2 + (b.lng - lng) ** 2)
+    );
+  }, [venues, activeCategory, userLocation, fetchCenter]);
+  const typeVisited = typeVenues.filter((v) => v.visited).length;
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3e3);
+  };
+  const fetchZoomRef = useRef(14);
+  const [cityName, setCityName] = useState("");
+  const [areaSuffix, setAreaSuffix] = useState("");
+  const areaSuffixRef = useRef("");
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      const loc = { lat: 37.7749, lng: -122.4194 };
+      setFetchCenter(loc);
+      setLocationNotice("Location unavailable. Showing San Francisco; move the map to explore your area.");
+      return;
+    }
+    let gotCenter = false;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserLocation(loc);
+        setLocationNotice("");
+        if (!gotCenter) {
+          gotCenter = true;
+          setFetchCenter(loc);
+        }
+      },
+      () => {
+        if (!gotCenter) {
+          gotCenter = true;
+          const loc = { lat: 37.7749, lng: -122.4194 };
+          setFetchCenter(loc);
+          setLocationNotice("Location access unavailable. Showing San Francisco; move the map to explore your area.");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15e3 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+  useEffect(() => {
+    if (!fetchCenter) return;
+    setCityName("");
+    setAreaSuffix("");
+    fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${fetchCenter.lat}&lon=${fetchCenter.lng}&format=json&zoom=10`
+    ).then((res) => res.json()).then((data) => {
+      const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county || "";
+      setCityName(city);
+      const state = data.address?.state || "";
+      const stateAbbrev = STATE_ABBREV[state] || state;
+      setAreaSuffix([city, stateAbbrev].filter(Boolean).join(", "));
+    }).catch(() => {
+    });
+  }, [fetchCenter]);
+  useEffect(() => {
+    if (!selectedVenue || selectedVenue.fsqData !== void 0) {
+      setFsqLoading(false);
+      return;
+    }
+    const cached = getApiCache(selectedVenue.id, "fsq");
+    if (cached !== void 0) {
+      const fsqData = cached;
+      setVenues((prev) => {
+        const updated = prev.map(
+          (v) => v.id === selectedVenue.id ? { ...v, fsqData } : v
+        );
+        venueCacheRef.current[activeCategory] = updated;
+        return updated;
+      });
+      setSelectedVenue(
+        (prev) => prev && prev.id === selectedVenue.id ? { ...prev, fsqData } : prev
+      );
+      setFsqLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setFsqLoading(true);
+    fetchFoursquareDetails(
+      selectedVenue.name,
+      selectedVenue.lat,
+      selectedVenue.lng
+    ).then((data) => {
+      if (cancelled) return;
+      const fsqData = data || null;
+      setApiCache(selectedVenue.id, "fsq", fsqData);
+      setVenues((prev) => {
+        const updated = prev.map(
+          (v) => v.id === selectedVenue.id ? { ...v, fsqData } : v
+        );
+        venueCacheRef.current[activeCategory] = updated;
+        return updated;
+      });
+      setSelectedVenue(
+        (prev) => prev && prev.id === selectedVenue.id ? { ...prev, fsqData } : prev
+      );
+      setFsqLoading(false);
+    }).catch(() => {
+      if (!cancelled) setFsqLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedVenue?.id]);
+  const applyGoogleData = useCallback(
+    (venueId, venueAddress, googleData, isVisited) => {
+      setVenues((prev) => {
+        const updated = prev.map((v) => {
+          if (v.id !== venueId) return v;
+          const patch = { ...v, googleData };
+          if (googleData?.address && (!v.address || v.address.trim() === "")) {
+            patch.address = googleData.address;
+          }
+          return patch;
+        });
+        venueCacheRef.current[activeCategory] = updated;
+        return updated;
+      });
+      const ghost = !isVisited && (googleData?.closed || googleData === null && (!venueAddress || venueAddress.trim() === ""));
+      if (ghost) {
+        setSelectedVenue(null);
+        showToast("Venue not found \u2014 removed from map");
+      } else {
+        setSelectedVenue((prev) => {
+          if (!prev || prev.id !== venueId) return prev;
+          const patch = { ...prev, googleData };
+          if (googleData?.address && (!prev.address || prev.address.trim() === "")) {
+            patch.address = googleData.address;
+          }
+          return patch;
+        });
+      }
+      setGoogleLoading(false);
+    },
+    [activeCategory]
+  );
+  useEffect(() => {
+    if (!selectedVenue || selectedVenue.googleData !== void 0) {
+      setGoogleLoading(false);
+      return;
+    }
+    const cached = getApiCache(selectedVenue.id, "google");
+    if (cached !== void 0) {
+      applyGoogleData(
+        selectedVenue.id,
+        selectedVenue.address,
+        cached,
+        selectedVenue.visited
+      );
+      return;
+    }
+    let cancelled = false;
+    setGoogleLoading(true);
+    fetchGooglePlaceDetails(
+      selectedVenue.name,
+      selectedVenue.lat,
+      selectedVenue.lng
+    ).then((data) => {
+      if (cancelled) return;
+      const googleData = data || null;
+      setApiCache(selectedVenue.id, "google", googleData);
+      applyGoogleData(
+        selectedVenue.id,
+        selectedVenue.address,
+        googleData,
+        selectedVenue.visited
+      );
+    }).catch(() => {
+      if (!cancelled) setGoogleLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedVenue?.id]);
+  const mergeVenues = useCallback((existing, fetched) => {
+    const map = new Map(existing.map((v) => [v.id, v]));
+    const savedVisits = visitsRef.current;
+    for (const v of fetched) {
+      if (map.has(v.id)) {
+        const old = map.get(v.id);
+        map.set(v.id, {
+          ...v,
+          visited: old.visited,
+          visitCount: old.visitCount || 0,
+          visits: old.visits || [],
+          latestVisit: old.latestVisit || null,
+          visitedAt: old.visitedAt,
+          photo: old.photo,
+          note: old.note,
+          fsqData: old.fsqData,
+          googleData: old.googleData
+        });
+      } else if (savedVisits[v.id] && savedVisits[v.id].visits.length > 0) {
+        const sv = savedVisits[v.id];
+        const latest = sv.visits[sv.visits.length - 1];
+        const latestPhoto = latest.hasPhoto ? getVisitPhoto(v.id, sv.visits.length - 1) : null;
+        map.set(v.id, {
+          ...v,
+          visited: true,
+          visitCount: sv.visits.length,
+          visits: sv.visits,
+          latestVisit: latest,
+          visitedAt: latest.at,
+          note: latest.note || "",
+          photo: latestPhoto
+        });
+      } else {
+        map.set(v.id, v);
+      }
+    }
+    return filterGhostVenues(Array.from(map.values()));
+  }, []);
+  useEffect(() => {
+    if (!fetchCenter) return;
+    const controller = new AbortController();
+    const radius = fetchCenter.radius ?? 4e3;
+    const searchKey = `${fetchCenter.lat},${fetchCenter.lng},${radius},${searchRetry}`;
+    const cached = venueCacheRef.current[activeCategory];
+    setSearchError(null);
+    if (cached && completedSearchRef.current[activeCategory] === searchKey) {
+      setVenues(cached);
+      setLoading(false);
+      return;
+    }
+    if (!fetchCenter.areaSearch || !cached) setLoading(true);
+    fetchVenues(fetchCenter.lat, fetchCenter.lng, activeCategory, controller.signal, radius).then((fetched) => {
+      if (controller.signal.aborted) return;
+      const hydrated = hydrateVisits(filterGhostVenues(fetched));
+      if (backfillVisitTypes(hydrated)) {
+        visitsRef.current = getVisits();
+        setVisitStats(getVisitStats());
+      }
+      const savedVisited = getVisitedVenues(activeCategory);
+      const existing = [...savedVisited, ...venueCacheRef.current[activeCategory] || []];
+      const merged = mergeVenues(existing, hydrated).map((v) => ({
+        ...v,
+        address: enrichAddress(v.address, areaSuffixRef.current)
+      }));
+      venueCacheRef.current[activeCategory] = merged;
+      completedSearchRef.current[activeCategory] = searchKey;
+      setVenues(merged);
+      setLoading(false);
+    }).catch((err) => {
+      if (controller.signal.aborted) return;
+      console.error("Failed to fetch venues:", err);
+      setSearchError("Couldn't load venues. Try again.");
+      setLoading(false);
+    });
+    return () => controller.abort();
+  }, [activeCategory, fetchCenter, searchRetry, hydrateVisits, mergeVenues]);
+  const handleSearchArea = useCallback(() => {
+    if (!searchArea) return;
+    fetchZoomRef.current = searchArea.zoom;
+    setFetchCenter({
+      lat: searchArea.lat,
+      lng: searchArea.lng,
+      radius: searchArea.radius,
+      areaSearch: true
+    });
+    setSearchArea(null);
+  }, [searchArea]);
+  useEffect(() => {
+    areaSuffixRef.current = areaSuffix;
+    if (!areaSuffix) return;
+    const cached = venueCacheRef.current[activeCategory];
+    if (!cached || !completedSearchRef.current[activeCategory]) return;
+    const updated = cached.map((v) => ({
+      ...v,
+      address: enrichAddress(v.address, areaSuffix)
+    }));
+    venueCacheRef.current[activeCategory] = updated;
+    setVenues(updated);
+  }, [areaSuffix, activeCategory, loading]);
+  const handleCheckin = useCallback(async () => {
+    if (!selectedVenue) return;
+    const savedType = selectedVenue.type || activeCategory;
+    const visit = { at: (/* @__PURE__ */ new Date()).toISOString(), note, hasPhoto: false };
+    let savedPhoto = null;
+    if (photo) {
+      savedPhoto = await resizePhoto(photo);
+      visit.hasPhoto = true;
+    }
+    const statsBefore = getVisitStats();
+    const statsBeforeVisitCount = getVisits()[selectedVenue.id]?.visits.length || 0;
+    addVisit(selectedVenue.id, visit, savedPhoto, savedType, {
+      name: selectedVenue.name,
+      lat: selectedVenue.lat,
+      lng: selectedVenue.lng
+    });
+    visitsRef.current = getVisits();
+    const stored = visitsRef.current[selectedVenue.id];
+    if (!stored || stored.visits.length !== statsBeforeVisitCount + 1) throw new Error("Visit storage is unavailable or full");
+    visit.hasPhoto = stored.visits[stored.visits.length - 1].hasPhoto;
+    if (!visit.hasPhoto) savedPhoto = null;
+    setVenues((prev) => {
+      const updated = prev.map((v) => {
+        if (v.id !== selectedVenue.id) return v;
+        const newVisits = [...v.visits || [], visit];
+        return {
+          ...v,
+          visited: true,
+          visitCount: newVisits.length,
+          visits: newVisits,
+          latestVisit: visit,
+          visitedAt: visit.at,
+          note,
+          photo: savedPhoto || v.photo
+        };
+      });
+      venueCacheRef.current[activeCategory] = updated;
+      return updated;
+    });
+    const statsAfter = getVisitStats();
+    setVisitStats(statsAfter);
+    const unlocked = ACHIEVEMENTS.filter(
+      (a) => (statsBefore[a.stat] || 0) < a.threshold && (statsAfter[a.stat] || 0) >= a.threshold
+    );
+    if (unlocked.length > 0) setAchievementQueue(unlocked);
+    setCheckinModal(false);
+    setShowCamera(false);
+    dialogReturnFocus?.focus();
+    setSelectedVenue(null);
+    setNote("");
+    setPhoto(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    showToast(`\u2705 Checked in to ${selectedVenue.name}!`);
+  }, [selectedVenue, note, photo, activeCategory]);
+  const completionPct = typeVenues.length ? Math.round(typeVisited / typeVenues.length * 100) : 0;
+  const [dark, setDark] = useState(false);
+  const [passportScope, setPassportScope] = useState("global");
+  const [saving, setSaving] = useState(false);
+  const [locationNotice, setLocationNotice] = useState("");
+  const [dialogReturnFocus, setDialogReturnFocus] = useState(null);
+  const dialogRef = useRef(null);
+  const allStamps = useMemo(() => getAllVisitedVenues(), [visitStats]);
+  const localStamps = allStamps.filter((v) => fetchCenter && Number.isFinite(v.lat) && Number.isFinite(v.lng) && distanceMiles(fetchCenter.lat, fetchCenter.lng, v.lat, v.lng) * 1609.344 <= (fetchCenter.radius ?? 4e3));
+  const displayedStamps = passportScope === "global" ? allStamps : localStamps;
+  const headlines = { food_drink: ["Find your next favorite.", "Good coffee, great food, and somewhere worth stopping."], day_explorer: ["A good day to get lost.", "Fresh air, quiet corners, and a different way home."], culture_run: ["Follow your curiosity.", "New perspectives, old stories, and a little inspiration."], active: ["Go a little further.", "Move your body. Clear your head. Find your own pace."] };
+  useEffect(() => {
+    document.body.classList.toggle("dark", dark);
+    document.querySelector('meta[name="theme-color"]').content = dark ? "#17231f" : "#f5f3ed";
+  }, [dark]);
+  const closeCheckin = () => {
+    setCheckinModal(false);
+    setShowCamera(false);
+    setNote("");
+    setPhoto(null);
+    dialogReturnFocus?.focus();
+  };
+  useEffect(() => {
+    if (!checkinModal) return;
+    dialogRef.current?.querySelector("textarea")?.focus();
+    const keydown = (event) => {
+      if (showCamera) return;
+      if (event.key === "Escape" && !saving) closeCheckin();
+      if (event.key !== "Tab") return;
+      const elements = [...dialogRef.current.querySelectorAll('button:not(:disabled), textarea, input:not([type="file"])')];
+      const first = elements[0], last = elements[elements.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", keydown);
+    return () => document.removeEventListener("keydown", keydown);
+  }, [checkinModal, showCamera, saving]);
+  const selectQuest = (id) => {
+    setActiveQuest(id);
+    setActiveCategory(getCategoriesForQuest(id)[0].id);
+    setSelectedVenue(null);
+    setPanel("list");
+  };
+  const selectVenue = (venue) => {
+    setSelectedVenue(venue);
+  };
+  const openCheckin = () => {
+    setDialogReturnFocus(document.activeElement);
+    setNote("");
+    setPhoto(null);
+    setCheckinModal(true);
+  };
+  const saveCheckin = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await handleCheckin();
+    } catch (error) {
+      console.error("Check-in failed", error);
+      showToast("Could not save your check-in. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const loadPhoto = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      showToast("Please choose an image.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setPhoto(reader.result);
+    reader.onerror = () => showToast("Failed to read photo");
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  };
+  const detailCard = selectedVenue && /* @__PURE__ */ React.createElement("div", { className: "live-detail" }, /* @__PURE__ */ React.createElement(VenueCard, { venue: selectedVenue, detailsLoading: fsqLoading || googleLoading, onClose: () => setSelectedVenue(null), onCheckin: openCheckin }), selectedVenue.visits?.length > 0 && /* @__PURE__ */ React.createElement("details", { className: "visit-history" }, /* @__PURE__ */ React.createElement("summary", null, "Visit history \xB7 ", selectedVenue.visits.length), selectedVenue.visits.slice().reverse().map((visit, i) => /* @__PURE__ */ React.createElement("div", { key: `${visit.at}-${i}` }, /* @__PURE__ */ React.createElement("strong", null, new Date(visit.at).toLocaleString()), visit.note && /* @__PURE__ */ React.createElement("p", null, visit.note), visit.hasPhoto && /* @__PURE__ */ React.createElement("img", { src: getVisitPhoto(selectedVenue.id, selectedVenue.visits.length - i - 1), alt: "Visit memory" })))));
+  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "preview" }, "CONNECTED UI PREVIEW ", /* @__PURE__ */ React.createElement("span", null, "\xB7 Live venues \xB7 Check-ins save to your City Quest passport")), /* @__PURE__ */ React.createElement("div", { className: "app" }, /* @__PURE__ */ React.createElement("header", null, /* @__PURE__ */ React.createElement("div", { className: "brand" }, /* @__PURE__ */ React.createElement("div", { className: "brand-mark", "aria-hidden": "true" }, "\u2197"), /* @__PURE__ */ React.createElement("div", { className: "brand-name" }, "city", /* @__PURE__ */ React.createElement("span", null, "quest")), /* @__PURE__ */ React.createElement("div", { className: "location" }, "EXPLORING", /* @__PURE__ */ React.createElement("strong", null, cityName || "Locating your area\u2026"))), /* @__PURE__ */ React.createElement("div", { className: "header-actions" }, /* @__PURE__ */ React.createElement("button", { className: "theme-toggle", id: "theme-toggle", "aria-pressed": dark, onClick: () => setDark(!dark) }, "\u25D0 ", dark ? "Light" : "Dark", " mode"))), /* @__PURE__ */ React.createElement("nav", { className: "quests", "aria-label": "Quest types" }, QUEST_TYPES.map((q) => /* @__PURE__ */ React.createElement("button", { key: q.id, className: `quest ${q.id === activeQuest ? "active" : ""}`, "aria-pressed": q.id === activeQuest, onClick: () => selectQuest(q.id) }, /* @__PURE__ */ React.createElement("span", { className: "emoji" }, q.emoji), q.label))), /* @__PURE__ */ React.createElement("main", null, /* @__PURE__ */ React.createElement("div", { className: "intro" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "eyebrow" }, "A little closer. A little more curious."), /* @__PURE__ */ React.createElement("h1", null, panel === "passport" ? "Every place has a story." : panel === "achievements" ? "Small steps. Real discoveries." : panel === "quests" ? "Choose your next adventure." : headlines[activeQuest][0]), /* @__PURE__ */ React.createElement("p", null, panel === "passport" ? "Your saved discoveries, across every quest." : panel === "achievements" ? "Earn badges as you explore, take photos, and write notes." : panel === "quests" ? "Four ways to explore. Every visit counts." : headlines[activeQuest][1])), /* @__PURE__ */ React.createElement("div", { className: "journey" }, /* @__PURE__ */ React.createElement("span", { className: "journey-icon" }, "\u2727"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("strong", { id: "progress" }, visitedCount, " ", visitedCount === 1 ? "place" : "places", " discovered"), /* @__PURE__ */ React.createElement("small", null, visitStats.photos, " photos \xB7 ", visitStats.notes, " notes")))), locationNotice && /* @__PURE__ */ React.createElement("div", { className: "location-notice", role: "status" }, locationNotice), /* @__PURE__ */ React.createElement("div", { className: `workspace live-workspace ${panel !== "list" ? "collection-workspace" : ""}` }, /* @__PURE__ */ React.createElement("aside", { className: "sidebar", "aria-label": "Venue browser" }, /* @__PURE__ */ React.createElement("nav", { className: "tabs", "aria-label": "View" }, [["list", "\u2197 Explore"], ["quests", "\u2727 Quests"], ["passport", "\u25A7 Passport"], ["achievements", "\u{1F3C6} Badges"]].map(([id, label]) => /* @__PURE__ */ React.createElement("button", { key: id, className: `tab ${panel === id ? "active" : ""}`, "aria-pressed": panel === id, onClick: () => {
+    setPanel(id);
+    setSelectedVenue(null);
+  } }, label))), panel === "list" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("nav", { className: "categories", "aria-label": "Venue categories" }, getCategoriesForQuest(activeQuest).map((c) => /* @__PURE__ */ React.createElement("button", { key: c.id, className: `category ${c.id === activeCategory ? "active" : ""}`, "aria-pressed": c.id === activeCategory, onClick: () => {
+    setActiveCategory(c.id);
+    setSelectedVenue(null);
+  } }, c.emoji, " ", c.label))), isDesktop && detailCard, /* @__PURE__ */ React.createElement("div", { className: "list-heading" }, /* @__PURE__ */ React.createElement("strong", null, loading ? "Finding nearby places\u2026" : `${typeVisited} of ${typeVenues.length} visited`), /* @__PURE__ */ React.createElement("span", null, completionPct, "% discovered")), /* @__PURE__ */ React.createElement("div", { className: "venue-list", id: "venue-list", "aria-busy": loading }, searchError && /* @__PURE__ */ React.createElement("div", { className: "empty", role: "alert" }, searchError, /* @__PURE__ */ React.createElement("button", { className: "category", onClick: () => setSearchRetry((n) => n + 1) }, "Retry")), !loading && !searchError && !typeVenues.length && /* @__PURE__ */ React.createElement("div", { className: "empty" }, "No places found here. Move the map and search another area."), typeVenues.map((v) => /* @__PURE__ */ React.createElement("button", { key: v.id, className: `venue-card ${selectedVenue?.id === v.id ? "selected" : ""}`, "aria-pressed": selectedVenue?.id === v.id, onClick: () => selectVenue(v) }, /* @__PURE__ */ React.createElement("span", { className: "venue-art" }, CATEGORY_MAP[v.type]?.emoji || "\u{1F4CD}"), /* @__PURE__ */ React.createElement("span", { className: "venue-copy" }, /* @__PURE__ */ React.createElement("h3", null, v.name), /* @__PURE__ */ React.createElement("p", null, v.address?.trim() || CATEGORY_MAP[v.type]?.label), /* @__PURE__ */ React.createElement("span", { className: "venue-meta" }, /* @__PURE__ */ React.createElement("span", { className: "venue-tag" }, v.visited ? `\u2713 Discovered \xB7 ${v.visitCount} visits` : "Make a little discovery"), /* @__PURE__ */ React.createElement("span", null, userLocation ? `${(distanceMiles(userLocation.lat, userLocation.lng, v.lat, v.lng) * 1.609344).toFixed(1)} km` : ""))))))), panel === "passport" && /* @__PURE__ */ React.createElement("div", { className: "collection-content" }, /* @__PURE__ */ React.createElement("div", { className: "categories" }, /* @__PURE__ */ React.createElement("button", { className: `category ${passportScope === "global" ? "active" : ""}`, onClick: () => setPassportScope("global"), "aria-pressed": passportScope === "global" }, "Global passport \xB7 ", allStamps.length), /* @__PURE__ */ React.createElement("button", { className: `category ${passportScope === "local" ? "active" : ""}`, onClick: () => setPassportScope("local"), "aria-pressed": passportScope === "local" }, "Current area \xB7 ", localStamps.length)), passportScope === "local" && /* @__PURE__ */ React.createElement("p", { className: "scope-note" }, "Stamps within ", ((fetchCenter?.radius ?? 4e3) / 1e3).toFixed(1), " km of the search center", cityName ? ` in ${cityName}` : "", "."), isDesktop && detailCard, /* @__PURE__ */ React.createElement("div", { className: "legacy-panel passport-panel" }, /* @__PURE__ */ React.createElement(PassportPanel, { venues: displayedStamps, userLocation, onVenueClick: selectVenue }))), panel === "achievements" && /* @__PURE__ */ React.createElement("div", { className: "collection-content" }, /* @__PURE__ */ React.createElement("div", { className: "legacy-panel" }, /* @__PURE__ */ React.createElement(AchievementsPanel, { stats: visitStats }))), panel === "quests" && /* @__PURE__ */ React.createElement("div", { className: "collection-content quest-overview" }, QUEST_TYPES.map((q) => /* @__PURE__ */ React.createElement("button", { className: "venue-card", key: q.id, onClick: () => selectQuest(q.id) }, /* @__PURE__ */ React.createElement("span", { className: "venue-art" }, q.emoji), /* @__PURE__ */ React.createElement("span", { className: "venue-copy" }, /* @__PURE__ */ React.createElement("h3", null, q.label), /* @__PURE__ */ React.createElement("p", null, getCategoriesForQuest(q.id).map((c) => c.label).join(" \xB7 ")), /* @__PURE__ */ React.createElement("span", { className: "venue-tag" }, visitStats[`quest_${q.id}`] || 0, " places discovered")), /* @__PURE__ */ React.createElement("span", null, "\u2197"))))), /* @__PURE__ */ React.createElement("section", { className: "map live-map", "aria-label": "Map of venues and your location", hidden: panel === "achievements" || panel === "quests" }, /* @__PURE__ */ React.createElement(PreviewMap, { venues: panel === "passport" ? displayedStamps.filter((v) => Number.isFinite(v.lat) && Number.isFinite(v.lng)) : typeVenues, userLocation, selectedVenue, fetchCenter, fetchZoom: fetchZoomRef.current, onSearchArea: setSearchArea, isMobile: !isDesktop, onVenueClick: selectVenue, dark }), !isDesktop && detailCard, /* @__PURE__ */ React.createElement("div", { className: "map-top" }, /* @__PURE__ */ React.createElement("div", { className: "map-label" }, "\u2316 ", cityName || "Your search area"), panel !== "passport" && /* @__PURE__ */ React.createElement("button", { className: "search-area", disabled: loading || !fetchCenter, onClick: () => {
+    if (searchArea) handleSearchArea();
+    else setSearchRetry((n) => n + 1);
+  } }, loading ? "Finding venues\u2026" : "\u21BB Search this area")))), /* @__PURE__ */ React.createElement("div", { className: "footer" }, /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("strong", null, "Take the scenic route."), " The best discoveries aren't always planned."), /* @__PURE__ */ React.createElement("span", null, "City Quest / a field guide to your city")))), checkinModal && selectedVenue && /* @__PURE__ */ React.createElement("div", { className: "modal-backdrop", onClick: (e) => {
+    if (e.target === e.currentTarget && !saving) closeCheckin();
+  } }, /* @__PURE__ */ React.createElement("div", { className: "checkin-dialog", role: "dialog", "aria-modal": "true", "aria-labelledby": "checkin-title", ref: dialogRef, "aria-busy": saving }, /* @__PURE__ */ React.createElement("div", { className: "detail-top" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "eyebrow" }, "Make a little discovery"), /* @__PURE__ */ React.createElement("h2", { id: "checkin-title" }, "Check in \xB7 ", selectedVenue.name)), /* @__PURE__ */ React.createElement("button", { className: "close-detail", onClick: closeCheckin, disabled: saving, "aria-label": "Cancel check-in" }, "\xD7")), /* @__PURE__ */ React.createElement("label", { htmlFor: "visit-note" }, "Add a note (optional)"), /* @__PURE__ */ React.createElement("textarea", { id: "visit-note", value: note, onChange: (e) => setNote(e.target.value), placeholder: "What made this place memorable?", disabled: saving }), /* @__PURE__ */ React.createElement("div", { className: "photo-actions" }, /* @__PURE__ */ React.createElement("button", { className: "category", disabled: saving, onClick: () => setShowCamera(true) }, "\u{1F4F7} ", photo ? "Retake" : "Take photo"), /* @__PURE__ */ React.createElement("button", { className: "category", disabled: saving, onClick: () => fileInputRef.current?.click() }, "\u{1F5BC} ", photo ? "Change" : "Photo library")), /* @__PURE__ */ React.createElement("input", { ref: fileInputRef, type: "file", accept: "image/*", hidden: true, onChange: loadPhoto }), photo && /* @__PURE__ */ React.createElement("div", { className: "photo-preview" }, /* @__PURE__ */ React.createElement("img", { src: photo, alt: "Photo for this check-in" }), /* @__PURE__ */ React.createElement("button", { className: "category", disabled: saving, onClick: () => setPhoto(null) }, "Remove photo")), /* @__PURE__ */ React.createElement("button", { className: "checkin", onClick: saveCheckin, disabled: saving }, saving ? "Saving\u2026" : "\u2713 Confirm check-in"), /* @__PURE__ */ React.createElement("button", { className: "cancel-checkin", disabled: saving, onClick: closeCheckin }, "Cancel"))), showCamera && checkinModal && /* @__PURE__ */ React.createElement(CameraOverlay, { onCapture: setPhoto, onClose: () => setShowCamera(false), showToast }), achievementQueue.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "modal-backdrop", role: "dialog", "aria-modal": "true", "aria-label": "Achievement unlocked" }, /* @__PURE__ */ React.createElement("div", { className: "checkin-dialog achievement-unlock" }, /* @__PURE__ */ React.createElement("div", { className: "achievement-emoji" }, achievementQueue[0].emoji), /* @__PURE__ */ React.createElement("div", { className: "eyebrow" }, "Achievement unlocked"), /* @__PURE__ */ React.createElement("h2", null, achievementQueue[0].label), /* @__PURE__ */ React.createElement("p", null, achievementQueue[0].desc), /* @__PURE__ */ React.createElement("button", { className: "checkin", autoFocus: true, onClick: () => setAchievementQueue((q) => q.slice(1)) }, "Continue", achievementQueue.length > 1 ? ` \xB7 ${achievementQueue.length - 1} more` : ""))), toast && /* @__PURE__ */ React.createElement("div", { className: "toast", role: "status" }, toast));
+}
+createRoot(document.getElementById("preview-root")).render(/* @__PURE__ */ React.createElement(PreviewApp, null));
   </script>
 </body>
 </html>
