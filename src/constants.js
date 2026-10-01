@@ -16,10 +16,10 @@
 // ── Quest Types (game modes) ──
 
 export const QUEST_TYPES = [
+  { id: "food_drink", label: "Food & Drink", emoji: "🍕🍻", color: "#f59e0b" },
   { id: "day_explorer", label: "Day Explorer", emoji: "☀️", color: "#38bdf8" },
   { id: "culture_run", label: "Culture Run", emoji: "🎨", color: "#a78bfa" },
   { id: "active", label: "Active", emoji: "🏃", color: "#22c55e" },
-  { id: "night_out", label: "Night Out", emoji: "🍻", color: "#f59e0b" },
 ];
 
 // ── Venue Categories ──
@@ -28,16 +28,14 @@ export const QUEST_TYPES = [
 // where Google Places coverage is poor (parks, monuments, nature reserves).
 
 export const VENUE_CATEGORIES = [
-  // ── Night Out ──
-  { id: "bar", quest: "night_out", label: "Bar", emoji: "🍺", color: "#f59e0b", osmTag: "amenity", osmValue: "bar" },
-  { id: "nightclub", quest: "night_out", label: "Club", emoji: "💃", color: "#e879f9", osmTag: "amenity", osmValue: "nightclub" },
-  { id: "pub", quest: "night_out", label: "Pub", emoji: "🍻", color: "#d97706", osmTag: "amenity", osmValue: "pub" },
-  { id: "restaurant", quest: "night_out", label: "Food", emoji: "🍔", color: "#10b981", osmTag: "amenity", osmValue: "restaurant" },
+  // ── Food & Drink ──
+  { id: "bar", quest: "food_drink", label: "Bar", emoji: "🍺", color: "#f59e0b", osmTag: "amenity", osmValue: ["bar", "pub", "nightclub"] },
+  { id: "cafe", quest: "food_drink", label: "Cafe", emoji: "☕", color: "#92400e", osmTag: "amenity", osmValue: ["cafe", "bakery"] },
+  { id: "ice_cream", quest: "food_drink", label: "Ice Cream", emoji: "🍦", color: "#ec4899", osmTag: "amenity", osmValue: "ice_cream" },
+  { id: "restaurant", quest: "food_drink", label: "Restaurant", emoji: "🍔", color: "#10b981", osmTag: "amenity", osmValue: "restaurant" },
 
   // ── Day Explorer ──
-  { id: "cafe", quest: "day_explorer", label: "Cafe", emoji: "☕", color: "#92400e", osmTag: "amenity", osmValue: ["cafe", "bakery"] },
   { id: "park", quest: "day_explorer", label: "Park", emoji: "🌳", color: "#16a34a", osmTag: "leisure", osmValue: ["park", "garden", "playground"], ghostFilter: false },
-  { id: "ice_cream", quest: "day_explorer", label: "Ice Cream", emoji: "🍦", color: "#ec4899", osmTag: "amenity", osmValue: "ice_cream" },
   { id: "viewpoint", quest: "day_explorer", label: "Viewpoint", emoji: "🏔️", color: "#0ea5e9", osmTag: "tourism", osmValue: "viewpoint", ghostFilter: false },
   { id: "beach", quest: "day_explorer", label: "Beach", emoji: "🏖️", color: "#fbbf24", osmTag: "natural", osmValue: "beach", ghostFilter: false },
 
@@ -125,10 +123,10 @@ export const ACHIEVEMENTS = [
   // ── Quest-level achievements ──
   {
     id: "night_owl_quest",
-    label: "Night Owl",
-    desc: "Visit 10 Night Out venues",
+    label: "Food Lover",
+    desc: "Visit 10 Food & Drink venues",
     emoji: "🍻",
-    stat: "quest_night_out",
+    stat: "quest_food_drink",
     threshold: 10,
     section: "quest",
   },
@@ -230,24 +228,6 @@ export const ACHIEVEMENTS = [
     desc: "Visit 5 theatres",
     emoji: "🎭",
     stat: "theatre",
-    threshold: 5,
-    section: "category",
-  },
-  {
-    id: "night_rider",
-    label: "Night Rider",
-    desc: "Visit 5 clubs",
-    emoji: "💃",
-    stat: "nightclub",
-    threshold: 5,
-    section: "category",
-  },
-  {
-    id: "pub_crawler",
-    label: "Pub Crawler",
-    desc: "Visit 5 pubs",
-    emoji: "🍻",
-    stat: "pub",
     threshold: 5,
     section: "category",
   },

@@ -121,7 +121,7 @@ function enrichAddress(address, suffix) {
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const isDesktop = useIsDesktop();
-  const [activeQuest, setActiveQuest] = useState("day_explorer");
+  const [activeQuest, setActiveQuest] = useState("food_drink");
   const [activeCategory, setActiveCategory] = useState("cafe");
   const [venues, setVenues] = useState([]);
   const [userLocation, setUserLocation] = useState(null);

@@ -17,7 +17,12 @@ const VISITS_KEY = "cityquest_visited";
 
 export function getVisits() {
   try {
-    return JSON.parse(localStorage.getItem(VISITS_KEY) || "{}");
+    const data = JSON.parse(localStorage.getItem(VISITS_KEY) || "{}");
+    // Older Pub and Club check-ins now belong to Bar; retain all visit history.
+    for (const entry of Object.values(data)) {
+      if (entry?.type === "pub" || entry?.type === "nightclub") entry.type = "bar";
+    }
+    return data;
   } catch {
     return {};
   }
