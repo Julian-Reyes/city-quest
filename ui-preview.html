@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f3ed">
+  <title>City Quest · UI playground</title>
+  <style>
+    /* Standalone design playground. Nothing here is imported by the main app. */
+    :root { --bg:#f5f3ed; --surface:#fffef9; --ink:#243c32; --muted:#79847a; --line:#e2e5db; --accent:#e96b44; --soft:#edf0e5; --shadow:0 12px 40px #243c3210; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    button { font:inherit; cursor:pointer; color:inherit; }
+    button:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
+    button { border:0; background:none; }
+    .preview { min-height:32px; padding:6px 24px; text-align:center; background:var(--ink); color:#f5f3ed; font-size:11px; letter-spacing:.05em; }
+    .preview span { opacity:.65; }
+    .app { max-width:1600px; margin:auto; }
+    header { height:90px; display:flex; align-items:center; justify-content:space-between; gap:20px; padding:0 36px; border-bottom:1px solid var(--line); }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .brand-mark { width:38px; height:38px; border-radius:12px; background:var(--ink); color:var(--surface); display:grid; place-items:center; font-size:25px; }
+    .brand-name { font-size:23px; font-weight:750; letter-spacing:-1px; }
+    .brand-name span { font-weight:400; }
+    .location { margin-left:24px; padding-left:24px; border-left:1px solid var(--line); color:var(--muted); }
+    .location strong { display:block; color:var(--ink); font-size:13px; }
+    .header-actions { display:flex; align-items:center; gap:20px; }
+    .theme-toggle { border:1px solid var(--line); border-radius:30px; padding:8px 15px; font-size:12px; }
+    .avatar { width:35px; height:35px; display:grid; place-items:center; border-radius:50%; background:#eadbc4; color:#5e523f; font-size:12px; font-weight:700; }
+    .quests { display:flex; justify-content:center; gap:8px; padding:20px 20px 12px; }
+    .quest { padding:11px 20px; border-radius:13px; color:var(--muted); font-size:13px; font-weight:600; white-space:nowrap; }
+    .quest.active { background:var(--ink); color:var(--surface); box-shadow:0 4px 12px #243c3218; }
+    .quest .emoji { font-size:18px; margin-right:8px; }
+    main { padding:14px 36px 28px; }
+    .intro { display:flex; align-items:end; justify-content:space-between; gap:20px; margin-bottom:24px; }
+    .eyebrow { text-transform:uppercase; letter-spacing:2px; font-size:10px; font-weight:700; color:var(--accent); }
+    h1 { font-family:Georgia,"Times New Roman",serif; font-weight:400; font-size:42px; letter-spacing:-1.7px; line-height:1.15; margin:7px 0; }
+    .intro p { margin:0; color:var(--muted); font-size:13px; }
+    .journey { display:flex; align-items:center; gap:12px; padding:10px 15px; border:1px solid var(--line); border-radius:14px; background:var(--surface); }
+    .journey-icon { font-size:24px; }
+    .journey strong { display:block; font-size:12px; }
+    .journey small { color:var(--muted); font-size:11px; }
+    .workspace { display:grid; grid-template-columns:340px minmax(0,1fr); gap:22px; height:580px; }
+    .sidebar { display:flex; flex-direction:column; min-height:0; }
+    .tabs { display:flex; gap:5px; padding:5px; border-radius:12px; background:var(--soft); margin-bottom:15px; }
+    .tab { flex:1; padding:7px 10px; border-radius:8px; font-size:12px; color:var(--muted); }
+    .tab.active { background:var(--surface); color:var(--ink); box-shadow:0 2px 6px #243c3208; }
+    .categories { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:20px; }
+    .category { padding:7px 11px; border:1px solid var(--line); border-radius:30px; background:var(--surface); font-size:11px; white-space:nowrap; }
+    .category.active { border-color:var(--accent); background:#e96b4410; color:var(--accent); }
+    .list-heading { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .list-heading strong { font-size:12px; }
+    .list-heading span { font-size:10px; color:var(--muted); }
+    .venue-list { overflow:auto; padding:0 3px 8px 0; scrollbar-width:thin; }
+    .venue-card { display:flex; width:100%; text-align:left; gap:13px; padding:14px; margin-bottom:9px; border:1px solid var(--line); border-radius:15px; background:var(--surface); transition:transform .18s,border-color .18s; }
+    .venue-card:hover { transform:translateY(-2px); }
+    .venue-card.selected { border-color:var(--accent); box-shadow:0 4px 14px #e96b440c; }
+    .venue-art { flex-shrink:0; width:62px; height:68px; display:grid; place-items:center; font-size:29px; border-radius:10px; background:var(--art,#ece1d1); position:relative; overflow:hidden; }
+    .venue-art::before { content:""; position:absolute; width:70px; height:70px; border:1px solid #ffffff80; border-radius:50%; right:-28px; bottom:-25px; }
+    .venue-copy { flex:1; min-width:0; }
+    .venue-copy h3 { margin:1px 0 3px; font-size:13px; font-weight:650; }
+    .venue-copy p { margin:0 0 7px; font-size:10px; color:var(--muted); }
+    .venue-meta { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); }
+    .venue-tag { color:#64826b; }
+    .map { position:relative; overflow:hidden; border:1px solid var(--line); border-radius:23px; background:#e7eadf; box-shadow:var(--shadow); }
+    .map svg { width:100%; height:100%; display:block; }
+    .map-grid { transform-origin:50% 50%; transition:transform .35s; }
+    .map-top { position:absolute; top:20px; left:20px; right:20px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .map-label { padding:9px 14px; background:#fffefaeb; color:#243c32; border:1px solid #ffffff; border-radius:10px; font-size:11px; box-shadow:0 4px 14px #243c3208; }
+    .search-area { padding:9px 16px; background:#243c32; color:#fffefa; border-radius:25px; font-size:11px; box-shadow:0 4px 15px #243c3220; }
+    .map-controls { position:absolute; right:19px; bottom:58px; padding:4px; display:flex; flex-direction:column; border-radius:12px; background:#fffef9; color:#243c32; box-shadow:var(--shadow); }
+    .map-controls button { width:34px; height:32px; font-size:20px; }
+    .map-controls button+button { border-top:1px solid #e2e5db; }
+    .map-credit { position:absolute; right:18px; bottom:14px; font-size:9px; color:#617565; }
+    .pin-layer { position:absolute; inset:0; pointer-events:none; transform-origin:50% 50%; transition:transform .35s; }
+    .pin { pointer-events:auto; position:absolute; transform:translate(-50%,-50%); width:35px; height:35px; background:#fffef9; color:#243c32; border:2px solid #fffef9; border-radius:50% 50% 50% 8px; box-shadow:0 3px 10px #243c3225; font-size:17px; transition:background .2s; }
+    .pin.selected { background:#e96b44; border-color:#e96b44; z-index:2; }
+    .user-dot { position:absolute; top:55%; left:54%; width:13px; height:13px; background:#607eb9; border:3px solid white; border-radius:50%; box-shadow:0 0 0 7px #607eb91f; }
+    .detail { position:absolute; left:20px; bottom:20px; width:280px; padding:18px; border-radius:17px; background:var(--surface); box-shadow:0 8px 30px #243c3218; }
+    .detail-top { display:flex; justify-content:space-between; align-items:start; gap:10px; }
+    .detail h2 { margin:4px 0; font-size:17px; letter-spacing:-.4px; }
+    .detail p { margin:5px 0 14px; color:var(--muted); font-size:11px; }
+    .close-detail { font-size:19px; line-height:1; padding:2px 5px; color:var(--muted); }
+    .checkin { width:100%; padding:10px; border-radius:10px; background:var(--ink); color:var(--surface); font-size:12px; font-weight:600; }
+    .footer { display:flex; justify-content:space-between; gap:20px; margin-top:18px; color:var(--muted); font-size:10px; }
+    .footer strong { color:var(--ink); font-weight:500; }
+    .empty { padding:30px 10px; text-align:center; color:var(--muted); font-size:12px; }
+    .toast { position:fixed; bottom:25px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--surface); padding:12px 20px; border-radius:30px; font-size:12px; z-index:10; box-shadow:var(--shadow); }
+    [hidden] { display:none!important; }
+    body.dark { --bg:#17231f; --surface:#23322b; --ink:#f0eee5; --muted:#a1afa3; --line:#36443a; --soft:#1e2c25; --shadow:0 12px 40px #0002; }
+    body.dark .preview { background:#0d1712; color:#f0eee5; }
+    body.dark .category.active { background:#e96b441a; }
+    body.dark .venue-tag { color:#a2c3a7; }
+    @media(min-width:1500px) { .workspace { height:660px; } }
+    @media(max-width:1000px) { header { padding:0 22px; } main { padding:14px 22px 22px; } .workspace { grid-template-columns:300px minmax(0,1fr); gap:16px; } .location { margin-left:14px; padding-left:14px; } .detail { width:245px; } .quest { padding:10px 14px; } }
+    @media(max-width:700px) {
+      header { height:72px; padding:0 18px; } .brand-name { font-size:21px; } .brand-mark { width:33px; height:33px; } .location,.avatar { display:none; }
+      .preview { font-size:9px; padding:5px 10px; } .header-actions { gap:0; } .theme-toggle { padding:6px 11px; font-size:10px; }
+      .quests { justify-content:start; overflow:auto; padding:14px 16px 8px; gap:5px; scrollbar-width:none; } .quest { padding:9px 12px; font-size:11px; } .quest .emoji { font-size:17px; margin-right:5px; }
+      main { padding:12px 18px 20px; } h1 { font-size:34px; } .intro { margin-bottom:18px; } .intro p { font-size:11px; } .journey { padding:8px 10px; gap:6px; } .journey-icon { display:none; } .journey strong { font-size:10px; } .journey small { font-size:9px; }
+      .workspace { display:flex; flex-direction:column; height:auto; gap:17px; } .sidebar { display:contents; } .tabs { order:0; margin-bottom:0; } .categories { order:1; margin-bottom:0; gap:7px; } .map { order:2; height:370px; flex-shrink:0; border-radius:18px; } .list-heading { order:3; margin-bottom:-8px; } .venue-list { order:4; max-height:none; overflow:visible; padding:0; }
+      .map-top { top:14px; left:14px; right:14px; } .map-label { padding:7px 10px; font-size:10px; } .search-area { padding:8px 11px; font-size:10px; } .detail { left:14px; bottom:14px; width:245px; padding:14px; } .detail h2 { font-size:15px; } .detail p { margin-bottom:10px; } .map-controls { right:14px; bottom:48px; } .footer { font-size:9px; } .footer span:last-child { display:none; }
+    }
+    @media(prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; } }
+  </style>
+</head>
+<body>
+  <div class="preview">DESIGN PLAYGROUND <span>· Sample venues · Your real check-ins are untouched</span></div>
+  <div class="app">
+    <header>
+      <div class="brand"><div class="brand-mark" aria-hidden="true">↗</div><div class="brand-name">city<span>quest</span></div><div class="location">EXPLORING<strong>Uberlândia, Brazil ↘</strong></div></div>
+      <div class="header-actions"><button class="theme-toggle" id="theme-toggle" aria-pressed="false">◐ Dark mode</button><div class="avatar" aria-label="Sample profile">JR</div></div>
+    </header>
+    <nav class="quests" aria-label="Quest types" id="quests"></nav>
+    <main>
+      <div class="intro"><div><div class="eyebrow">A little closer. A little more curious.</div><h1 id="headline">Find your next favorite.</h1><p id="subtitle">Good coffee, great food, and somewhere worth stopping.</p></div><div class="journey"><span class="journey-icon">✧</span><div><strong id="progress">0 places discovered</strong><small>Your story starts around the corner.</small></div></div></div>
+      <div class="workspace">
+        <aside class="sidebar" aria-label="Venue browser">
+          <nav class="tabs" aria-label="View"><button class="tab active" data-view="explore" aria-pressed="true">↗ Explore</button><button class="tab" data-view="passport" aria-pressed="false">▧ Passport</button></nav>
+          <nav class="categories" aria-label="Venue categories" id="categories"></nav>
+          <div class="list-heading"><strong id="list-title">A few places to start</strong><span id="result-count"></span></div>
+          <div class="venue-list" id="venue-list"></div>
+        </aside>
+        <section class="map" aria-label="Illustrated sample map, not a geographic map">
+          <svg viewBox="0 0 900 640" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <defs><pattern id="blocks" width="120" height="100" patternTransform="rotate(-24)" patternUnits="userSpaceOnUse"><rect width="120" height="100" fill="#e8e9dc"/><rect x="10" y="10" width="100" height="80" rx="7" fill="#dcded0"/><path d="M120 0H0V100" fill="none" stroke="#fffdf3" stroke-width="9"/></pattern></defs>
+            <g class="map-grid" id="map-grid"><rect x="-900" y="-640" width="2700" height="1920" fill="url(#blocks)"/><path d="M640 -100C510 70 670 190 620 280S510 420 595 760" fill="none" stroke="#bfcfb9" stroke-width="120"/><path d="M640 -100C510 70 670 190 620 280S510 420 595 760" fill="none" stroke="#b3ced0" stroke-width="35"/><path d="M-100 490L980 28M145 -90L485 740M-90 200L940 430" stroke="#cdcbbb" stroke-width="25" fill="none"/><path d="M-100 490L980 28M145 -90L485 740M-90 200L940 430" stroke="#fffdf3" stroke-width="20" fill="none"/><path d="M-100 490L980 28" stroke="#ecd3ac" stroke-width="9"/><path d="M710 110l135 62-50 112-100-22-27-70zM95 30l140 40-55 100-115-20zM80 480l110 20 55 100-160 30z" fill="#b9c8a8"/><g fill="#95aa86"><circle cx="725" cy="180" r="14"/><circle cx="750" cy="200" r="11"/><circle cx="780" cy="185" r="16"/><circle cx="130" cy="100" r="12"/><circle cx="151" cy="120" r="10"/><circle cx="130" cy="550" r="17"/></g><g fill="#8a9380" font-family="sans-serif" font-size="12" letter-spacing="3"><text x="300" y="230">CENTRO</text><text x="145" y="420" transform="rotate(-24 145 420)" font-size="10" letter-spacing="1">Avenida Afonso Pena</text><text x="682" y="337">SANTA MÔNICA</text><text x="80" y="340">MARTINS</text><text x="680" y="240" font-size="9" letter-spacing="1">A little green space</text></g></g>
+          </svg>
+          <div class="pin-layer" id="pins"></div><div class="user-dot" aria-label="Sample location"></div>
+          <div class="map-top"><div class="map-label">⌖ Uberlândia <span style="opacity:.5">/ sample area</span></div><button class="search-area" id="search-area">↻ Search this area</button></div>
+          <div class="map-controls"><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-out" aria-label="Zoom out">−</button><button id="recenter" aria-label="Recenter map">⌖</button></div>
+          <div class="detail" id="detail" hidden></div><div class="map-credit">Illustrated map · design preview</div>
+        </section>
+      </div>
+      <div class="footer"><span><strong>Take the scenic route.</strong> The best discoveries aren't always planned.</span><span>City Quest / a field guide to your city</span></div>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script>
+    // Sample data and in-memory interactions only: no APIs, geolocation or storage.
+    const quests = [
+      { id:'food', label:'Food & Drink', emoji:'🍕 🍻', categories:[['bar','Bar','🍺'],['cafe','Cafe','☕'],['ice','Ice Cream','🍦'],['restaurant','Restaurant','🍽️']], headline:'Find your next favorite.', subtitle:'Good coffee, great food, and somewhere worth stopping.' },
+      { id:'day', label:'Day Explorer', emoji:'☀️', categories:[['park','Park','🌳'],['view','Viewpoint','🌄'],['beach','Beach','🏖️']], headline:'A good day to get lost.', subtitle:'Fresh air, quiet corners, and a different way home.' },
+      { id:'culture', label:'Culture Run', emoji:'🎨', categories:[['museum','Museum','🏛️'],['gallery','Gallery','🖼️'],['theatre','Theatre','🎭'],['library','Library','📚'],['landmark','Landmark','🗿']], headline:'Follow your curiosity.', subtitle:'New perspectives, old stories, and a little inspiration.' },
+      { id:'active', label:'Active', emoji:'🏃', categories:[['trail','Trail','🥾'],['swim','Swimming','🏊'],['skate','Skate','🛹'],['climb','Climbing','🧗']], headline:'Go a little further.', subtitle:'Move your body. Clear your head. Find your own pace.' }
+    ];
+    const examples = {
+      cafe:[['Café do Pátio','Coffee & a quiet courtyard','0.3 km','Outdoor seating','#e7dcc9'],['Grão & Prosa','Specialty coffee · small bites','0.6 km','A local favorite','#d8e0ca'],['Casa de Café','Coffee shop · fresh pastries','0.9 km','Something sweet','#e8d3c6'],['O Pequeno Espresso','A little coffee, a little pause','1.2 km','Cozy corner','#d8dfe3']],
+      bar:[['Bar da Esquina','Cold drinks · good company','0.4 km','Neighborhood spot','#e7d5c0'],['Pátio Cervejeiro','Craft beer · open courtyard','0.8 km','Outdoor seating','#d9e0cd'],['Última Rodada','Music · cocktails · late nights','1.1 km','Stay a little longer','#dfd2df']],
+      ice:[['Gelato da Praça','Small batches · big scoops','0.2 km','Made with care','#ebd5d0'],['Doce Domingo','Ice cream · sunny afternoons','0.7 km','Something sweet','#e5dfbe']],
+      restaurant:[['Mesa & Jardim','Seasonal plates · garden tables','0.5 km','Slow down here','#d5dfc7'],['Forno da Vila','Wood-fired pizza · neighborhood kitchen','0.8 km','Share a slice','#e8d3c3'],['Casa do Sabor','Brazilian favorites · warm welcome','1.3 km','A local favorite','#e1dbc8']],
+      park:[['Um Jardim no Caminho','Green space · shady paths','0.5 km','Fresh air','#cfdec1'],['Parque do Bairro','A little escape from the city','1.0 km','Take a walk','#d8e2cb']]
+    };
+    let activeQuest='food', activeCategory='cafe', view='explore', selected=null, zoom=1, toastTimer;
+    const visited = new Set();
+    const allVenues = quests.flatMap(q=>q.categories.flatMap(([category,label,emoji]) => (examples[category] || [[`A little ${label.toLowerCase()} discovery`,'A sample place to explore','0.7 km','Worth a detour','#dce1d0'],[`Another ${label.toLowerCase()} to try`,'Somewhere new around the corner','1.2 km','Follow your curiosity','#e5d9ca']]).map((row,i)=>({id:`${category}-${i}`,category,emoji,name:row[0],description:row[1],distance:row[2],tag:row[3],color:row[4],x:[42,66,30,74][i],y:[39,46,65,69][i]}))));
+    const byId = id => allVenues.find(v=>v.id===id);
+    const $ = id => document.getElementById(id);
+    function notify(message) { $('toast').textContent=message; $('toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('toast').hidden=true,2600); }
+    function render() {
+      const quest=quests.find(q=>q.id===activeQuest);
+      $('quests').innerHTML=quests.map(q=>`<button class="quest ${q.id===activeQuest?'active':''}" data-quest="${q.id}" aria-pressed="${q.id===activeQuest}"><span class="emoji">${q.emoji}</span>${q.label}</button>`).join('');
+      $('categories').innerHTML=quest.categories.map(([id,label,emoji])=>`<button class="category ${id===activeCategory?'active':''}" data-category="${id}" aria-pressed="${id===activeCategory}">${emoji} ${label}</button>`).join('');
+      $('categories').hidden=view==='passport';
+      $('headline').textContent=view==='passport'?'Every place has a story.':quest.headline;
+      $('subtitle').textContent=view==='passport'?'A little collection of places you made your own.':quest.subtitle;
+      const venues=allVenues.filter(v=>view==='passport'?visited.has(v.id):v.category===activeCategory);
+      if(selected && !venues.some(v=>v.id===selected)) selected=null;
+      $('list-title').textContent=view==='passport'?'Your discoveries':'A few places to start';
+      $('result-count').textContent=`${venues.length} ${venues.length===1?'place':'places'}`;
+      $('progress').textContent=`${visited.size} ${visited.size===1?'place':'places'} discovered`;
+      $('venue-list').innerHTML=venues.length?venues.map(v=>`<button class="venue-card ${selected===v.id?'selected':''}" data-venue="${v.id}" aria-pressed="${selected===v.id}"><span class="venue-art" style="--art:${v.color}">${v.emoji}</span><span class="venue-copy"><h3>${v.name}</h3><p>${v.description}</p><span class="venue-meta"><span class="venue-tag">${visited.has(v.id)?'✓ Discovered':v.tag}</span><span>↗ ${v.distance}</span></span></span></button>`).join(''):'<div class="empty">Your passport is a blank page.<br>Pick a place in Explore and check in to start.</div>';
+      $('pins').innerHTML=venues.map(v=>`<button class="pin ${selected===v.id?'selected':''}" data-venue="${v.id}" style="left:${v.x}%;top:${v.y}%" aria-label="${v.name}" aria-pressed="${selected===v.id}">${visited.has(v.id)?'✓':v.emoji}</button>`).join('');
+      document.querySelectorAll('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-pressed',b.dataset.view===view);});
+      const venue=byId(selected); $('detail').hidden=!venue;
+      if(venue) $('detail').innerHTML=`<div class="detail-top"><div><div class="eyebrow">${visited.has(venue.id)?'One for your story':'Make a little discovery'}</div><h2>${venue.name}</h2></div><button class="close-detail" id="close-detail" aria-label="Close venue">×</button></div><p>${venue.description} · ${venue.distance} away</p><button class="checkin" id="checkin" ${visited.has(venue.id)?'disabled':''}>${visited.has(venue.id)?'✓ Added to your passport':'＋ Check in here'}</button>`;
+    }
+    document.addEventListener('click',event=>{
+      const button=event.target.closest('button'); if(!button)return;
+      if(button.dataset.quest){activeQuest=button.dataset.quest;activeCategory=quests.find(q=>q.id===activeQuest).categories[0][0];selected=null;view='explore';render();}
+      else if(button.dataset.category){activeCategory=button.dataset.category;selected=null;render();}
+      else if(button.dataset.view){view=button.dataset.view;selected=null;render();}
+      else if(button.dataset.venue){selected=button.dataset.venue;render();}
+      else if(button.id==='close-detail'){selected=null;render();}
+      else if(button.id==='checkin'){visited.add(selected);render();notify('A new place, a new story. Added to your sample passport.');}
+      else if(button.id==='theme-toggle'){const dark=document.body.classList.toggle('dark');button.textContent=dark?'◐ Light mode':'◐ Dark mode';button.setAttribute('aria-pressed',dark);document.querySelector('meta[name="theme-color"]').content=dark?'#17231f':'#f5f3ed';}
+      else if(button.id==='search-area'){notify('Sample area refreshed. This preview uses illustrated venues.');}
+      else if(['zoom-in','zoom-out','recenter'].includes(button.id)){zoom=button.id==='recenter'?1:Math.max(.8,Math.min(1.8,zoom+(button.id==='zoom-in'?.2:-.2)));$('map-grid').style.transform=`scale(${zoom})`;$('pins').style.transform=`scale(${zoom})`;}
+    });
+    render();
+  </script>
+</body>
+</html>
