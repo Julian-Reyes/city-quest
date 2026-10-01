@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
@@ -6,6 +7,14 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   base: "/city-quest/",
   envDir: process.env.CI ? "." : "../secret",
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        preview: fileURLToPath(new URL("./ui-preview.html", import.meta.url)),
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
