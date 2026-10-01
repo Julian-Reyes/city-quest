@@ -126,8 +126,8 @@
     .collection-content { min-height:0; overflow:auto; flex:1; }
     .legacy-panel { color:#f0eee5; background:#17231f; border-radius:16px; min-height:300px; }
     .scope-note { font-size:11px; color:var(--muted); }
-    .collection-workspace:has(.quest-overview), .collection-workspace:has(.legacy-panel):not(:has(.passport-panel)) { display:block; }
-    .collection-workspace:has(.quest-overview) .sidebar,.collection-workspace:has(.legacy-panel):not(:has(.passport-panel)) .sidebar { height:100%; max-width:1000px; margin:auto; }
+    .collection-workspace:has(.legacy-panel):not(:has(.passport-panel)) { display:block; }
+    .collection-workspace:has(.legacy-panel):not(:has(.passport-panel)) .sidebar { height:100%; max-width:1000px; margin:auto; }
     .quest-overview .venue-card { align-items:center; }
     .location-notice { padding:10px 14px; border:1px solid var(--line); border-radius:12px; margin-bottom:16px; font-size:12px; }
     .modal-backdrop { position:fixed; inset:0; z-index:1000; background:#10201caa; backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; padding:20px; }
@@ -151,6 +151,7 @@
       .live-map .live-detail { position:absolute; left:12px; right:12px; bottom:12px; max-height:65%; z-index:550; margin:0; border-radius:16px; background:var(--surface); box-shadow:var(--shadow); }
       .live-map:has(.live-detail) .map-controls { bottom:auto; top:64px; }
       .collection-content { order:3; overflow:visible; }
+      .collection-content:has(.passport-panel) { order:1; }
       .collection-workspace { display:flex; }
       .collection-workspace:has(.quest-overview),.collection-workspace:has(.legacy-panel):not(:has(.passport-panel)) { display:flex; }
       .collection-workspace:has(.quest-overview) .sidebar,.collection-workspace:has(.legacy-panel):not(:has(.passport-panel)) .sidebar { display:contents; }
@@ -188,7 +189,7 @@ function userIcon(isMobile = false) {
     iconAnchor: [size / 2, size / 2]
   });
 }
-function RecenterMap({ center, selectedVenue }) {
+function RecenterMap({ center, selectedVenue, passportCenter }) {
   const map = useMap();
   const hasInitialized = useRef(false);
   useEffect(() => {
@@ -202,6 +203,9 @@ function RecenterMap({ center, selectedVenue }) {
       map.setView([selectedVenue.lat, selectedVenue.lng], map.getZoom());
     }
   }, [selectedVenue]);
+  useEffect(() => {
+    if (passportCenter) map.setView([passportCenter.lat, passportCenter.lng], 14);
+  }, [map, passportCenter]);
   return null;
 }
 function MapMoveDetector({ fetchCenter, fetchZoom, onSearchArea }) {
@@ -231,6 +235,7 @@ function MapMoveDetector({ fetchCenter, fetchZoom, onSearchArea }) {
   return null;
 }
 function PreviewMap({
+  passportCenter,
   venues,
   userLocation,
   onVenueClick,
@@ -259,7 +264,7 @@ function PreviewMap({
       }
     ),
     /* @__PURE__ */ React.createElement(PreviewMapControls, { userLocation }),
-    /* @__PURE__ */ React.createElement(RecenterMap, { center: userLocation || fetchCenter, selectedVenue }),
+    /* @__PURE__ */ React.createElement(RecenterMap, { center: userLocation || fetchCenter, selectedVenue, passportCenter }),
     /* @__PURE__ */ React.createElement(MapMoveDetector, { fetchCenter, fetchZoom, onSearchArea }),
     venues.map((venue) => /* @__PURE__ */ React.createElement(
       Marker,
@@ -379,6 +384,52 @@ function enrichAddress(address, suffix) {
   if (address.includes(",")) return address;
   return `${address}, ${suffix}`;
 }
+// City metadata belongs to this preview; the shared visit history stays intact.
+const PASSPORT_CITIES_KEY = "cityquest_preview_cities_v1";
+function readPassportCities() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PASSPORT_CITIES_KEY) || "{}");
+    return Object.fromEntries(Object.entries(saved).filter(([, city]) => city?.id && city?.name));
+  } catch { return {}; }
+}
+function passportCoordinates(venue) {
+  return Number.isFinite(venue?.lat) && Number.isFinite(venue?.lng)
+    ? `${venue.lat},${venue.lng}` : null;
+}
+function passportCityFromAddress(address) {
+  const name = address?.city || address?.town || address?.village || address?.municipality || address?.county;
+  if (!name) throw new Error("City not found for these coordinates");
+  const state = address.state || "";
+  const country = address.country_code || address.country || "";
+  const normalize = value => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  return { id: `city:${[country, state, name].map(normalize).join("|")}`, name, state, country };
+}
+let passportCityCache = readPassportCities();
+const passportCityRequests = new Map();
+let passportCityQueue = Promise.resolve();
+let lastPassportCityRequest = 0;
+function resolvePassportCity(venue) {
+  const coordinates = passportCoordinates(venue);
+  if (!coordinates) return Promise.reject(new Error("Missing venue coordinates"));
+  if (passportCityCache[coordinates]) return Promise.resolve(passportCityCache[coordinates]);
+  if (passportCityRequests.has(coordinates)) return passportCityRequests.get(coordinates);
+  // Serialize reverse lookups and reuse successful results across visits and reloads.
+  const request = passportCityQueue.catch(() => {}).then(async () => {
+    const wait = Math.max(0, 1100 - (Date.now() - lastPassportCityRequest));
+    if (wait) await new Promise(resolve => setTimeout(resolve, wait));
+    lastPassportCityRequest = Date.now();
+    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${venue.lat}&lon=${venue.lng}&format=json&zoom=10`, { signal: AbortSignal.timeout(15000) });
+    if (!response.ok) throw new Error(`City lookup failed: ${response.status}`);
+    const city = passportCityFromAddress((await response.json()).address);
+    passportCityCache = { ...passportCityCache, [coordinates]: city };
+    try { localStorage.setItem(PASSPORT_CITIES_KEY, JSON.stringify(passportCityCache)); } catch { /* In-memory results still work when storage is full. */ }
+    return city;
+  });
+  passportCityRequests.set(coordinates, request);
+  passportCityQueue = request;
+  request.then(() => passportCityRequests.delete(coordinates), () => passportCityRequests.delete(coordinates));
+  return request;
+}
 function PreviewApp() {
   const isDesktop = useIsDesktop();
   const [activeQuest, setActiveQuest] = useState("food_drink");
@@ -450,6 +501,8 @@ function PreviewApp() {
   };
   const fetchZoomRef = useRef(14);
   const [cityName, setCityName] = useState("");
+  const [currentCity, setCurrentCity] = useState(null);
+  const [cityRetry, setCityRetry] = useState(0);
   const [areaSuffix, setAreaSuffix] = useState("");
   const areaSuffixRef = useRef("");
   useEffect(() => {
@@ -484,19 +537,19 @@ function PreviewApp() {
   }, []);
   useEffect(() => {
     if (!fetchCenter) return;
+    let cancelled = false;
     setCityName("");
+    setCurrentCity(null);
     setAreaSuffix("");
-    fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${fetchCenter.lat}&lon=${fetchCenter.lng}&format=json&zoom=10`
-    ).then((res) => res.json()).then((data) => {
-      const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county || "";
-      setCityName(city);
-      const state = data.address?.state || "";
-      const stateAbbrev = STATE_ABBREV[state] || state;
-      setAreaSuffix([city, stateAbbrev].filter(Boolean).join(", "));
-    }).catch(() => {
-    });
-  }, [fetchCenter]);
+    resolvePassportCity(fetchCenter).then(city => {
+      if (cancelled) return;
+      setCurrentCity(city);
+      setCityName(city.name);
+      setCityByCoordinates(previous => ({ ...previous, [passportCoordinates(fetchCenter)]: city }));
+      setAreaSuffix([city.name, STATE_ABBREV[city.state] || city.state].filter(Boolean).join(", "));
+    }).catch(() => { /* Passport lookup status offers a retry without mislabeling visits. */ });
+    return () => { cancelled = true; };
+  }, [fetchCenter, cityRetry]);
   useEffect(() => {
     if (!selectedVenue || selectedVenue.fsqData !== void 0) {
       setFsqLoading(false);
@@ -772,13 +825,82 @@ function PreviewApp() {
   const completionPct = typeVenues.length ? Math.round(typeVisited / typeVenues.length * 100) : 0;
   const [dark, setDark] = useState(false);
   const [passportScope, setPassportScope] = useState("global");
+  const [questScope, setQuestScope] = useState("global");
   const [saving, setSaving] = useState(false);
   const [locationNotice, setLocationNotice] = useState("");
   const [dialogReturnFocus, setDialogReturnFocus] = useState(null);
   const dialogRef = useRef(null);
   const allStamps = useMemo(() => getAllVisitedVenues(), [visitStats]);
-  const localStamps = allStamps.filter((v) => fetchCenter && Number.isFinite(v.lat) && Number.isFinite(v.lng) && distanceMiles(fetchCenter.lat, fetchCenter.lng, v.lat, v.lng) * 1609.344 <= (fetchCenter.radius ?? 4e3));
-  const displayedStamps = passportScope === "global" ? allStamps : localStamps;
+  const [cityByCoordinates, setCityByCoordinates] = useState(readPassportCities);
+  const [citiesLoading, setCitiesLoading] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const stamps = allStamps.filter(venue => passportCoordinates(venue));
+    setCitiesLoading(stamps.length > 0);
+    async function locateCities() {
+      for (const venue of stamps) {
+        if (cancelled) return;
+        try {
+          const city = await resolvePassportCity(venue);
+          if (!cancelled) setCityByCoordinates(previous => ({ ...previous, [passportCoordinates(venue)]: city }));
+        } catch { /* Keep unresolved visits in Global and offer a retry. */ }
+      }
+      if (!cancelled) setCitiesLoading(false);
+    }
+    locateCities();
+    return () => { cancelled = true; };
+  }, [allStamps, cityRetry]);
+  const cityPassports = useMemo(() => {
+    const groups = new Map();
+    for (const venue of allStamps) {
+      const city = cityByCoordinates[passportCoordinates(venue)];
+      if (!city) continue;
+      if (!groups.has(city.id)) groups.set(city.id, { ...city, venues: [] });
+      groups.get(city.id).venues.push(venue);
+    }
+    if (currentCity && !groups.has(currentCity.id)) groups.set(currentCity.id, { ...currentCity, venues: [] });
+    const cities = [...groups.values()];
+    return cities.map(city => ({ ...city, label: cities.some(other => other.id !== city.id && other.name === city.name) ? `${city.name}, ${STATE_ABBREV[city.state] || city.state || city.country}` : city.name }))
+      .sort((a, b) => (a.id === currentCity?.id) - (b.id === currentCity?.id) || a.label.localeCompare(b.label));
+  }, [allStamps, cityByCoordinates, currentCity]);
+  const selectedCityPassport = cityPassports.find(city => city.id === passportScope);
+  const displayedStamps = passportScope === "global" ? allStamps : selectedCityPassport?.venues || [];
+  const selectedQuestCity = cityPassports.find(city => city.id === questScope);
+  const questVenues = questScope === "global" ? allStamps : selectedQuestCity?.venues || [];
+  const questCounts = useMemo(() => {
+    const counts = {};
+    for (const venue of questVenues) {
+      const questId = CATEGORY_MAP[venue.type]?.quest;
+      if (questId) counts[questId] = (counts[questId] || 0) + 1;
+    }
+    return counts;
+  }, [questVenues]);
+  const unresolvedCities = allStamps.filter(venue => !cityByCoordinates[passportCoordinates(venue)]).length;
+  const passportCenter = useMemo(() => {
+    const scope = panel === "quests" ? questScope : passportScope;
+    if (!["passport", "quests"].includes(panel) || scope === "global") return null;
+    const city = panel === "quests" ? selectedQuestCity : selectedCityPassport;
+    const venue = city?.venues.find(venue => passportCoordinates(venue));
+    return venue ? { lat: venue.lat, lng: venue.lng } : currentCity?.id === scope ? fetchCenter : null;
+  }, [panel, passportScope, questScope, selectedCityPassport, selectedQuestCity, currentCity, fetchCenter]);
+  useEffect(() => {
+    if (citiesLoading) return;
+    if (passportScope !== "global" && !cityPassports.some(city => city.id === passportScope)) setPassportScope("global");
+    if (questScope !== "global" && !cityPassports.some(city => city.id === questScope)) setQuestScope("global");
+  }, [passportScope, questScope, cityPassports, citiesLoading]);
+  function renderCitySwitcher(scope, setScope, context) {
+    const unit = context === "passports" ? "stamps" : "places";
+    return React.createElement(React.Fragment, null,
+      React.createElement("nav", { className: "categories", "aria-label": `City ${context}` },
+        React.createElement("button", { className: `category ${scope === "global" ? "active" : ""}`, "aria-pressed": scope === "global", onClick: () => { setScope("global"); setSelectedVenue(null); } }, `Global · ${allStamps.length}`),
+        cityPassports.map(city => React.createElement("button", { key: city.id, className: `category ${scope === city.id ? "active" : ""}`, "aria-pressed": scope === city.id, "aria-label": `${city.label}${city.id === currentCity?.id ? ", current city" : ""}, ${city.venues.length} ${unit}`, onClick: () => { setScope(city.id); setSelectedVenue(null); } }, `${city.label} · ${city.venues.length}`))
+      ),
+      citiesLoading && React.createElement("p", { className: "scope-note", role: "status" }, "Finding cities for your saved check-ins…"),
+      !citiesLoading && (unresolvedCities > 0 || (fetchCenter && !currentCity)) && React.createElement("p", { className: "scope-note", role: "status" }, "Some cities could not be identified. All check-ins remain in Global. ", React.createElement("button", { className: "category", onClick: () => setCityRetry(value => value + 1) }, "Retry city lookup"))
+    );
+  }
+  const passportSwitcher = renderCitySwitcher(passportScope, setPassportScope, "passports");
+  const questSwitcher = renderCitySwitcher(questScope, setQuestScope, "quests");
   const headlines = { food_drink: ["Find your next favorite.", "Good coffee, great food, and somewhere worth stopping."], day_explorer: ["A good day to get lost.", "Fresh air, quiet corners, and a different way home."], culture_run: ["Follow your curiosity.", "New perspectives, old stories, and a little inspiration."], active: ["Go a little further.", "Move your body. Clear your head. Find your own pace."] };
   useEffect(() => {
     document.body.classList.toggle("dark", dark);
@@ -858,7 +980,7 @@ function PreviewApp() {
   } }, label))), panel === "list" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("nav", { className: "categories", "aria-label": "Venue categories" }, getCategoriesForQuest(activeQuest).map((c) => /* @__PURE__ */ React.createElement("button", { key: c.id, className: `category ${c.id === activeCategory ? "active" : ""}`, "aria-pressed": c.id === activeCategory, onClick: () => {
     setActiveCategory(c.id);
     setSelectedVenue(null);
-  } }, c.emoji, " ", c.label))), isDesktop && detailCard, /* @__PURE__ */ React.createElement("div", { className: "list-heading" }, /* @__PURE__ */ React.createElement("strong", null, loading ? "Finding nearby places\u2026" : `${typeVisited} of ${typeVenues.length} visited`), /* @__PURE__ */ React.createElement("span", null, completionPct, "% discovered")), /* @__PURE__ */ React.createElement("div", { className: "venue-list", id: "venue-list", "aria-busy": loading }, searchError && /* @__PURE__ */ React.createElement("div", { className: "empty", role: "alert" }, searchError, /* @__PURE__ */ React.createElement("button", { className: "category", onClick: () => setSearchRetry((n) => n + 1) }, "Retry")), !loading && !searchError && !typeVenues.length && /* @__PURE__ */ React.createElement("div", { className: "empty" }, "No places found here. Move the map and search another area."), typeVenues.map((v) => /* @__PURE__ */ React.createElement("button", { key: v.id, className: `venue-card ${selectedVenue?.id === v.id ? "selected" : ""}`, "aria-pressed": selectedVenue?.id === v.id, onClick: () => selectVenue(v) }, /* @__PURE__ */ React.createElement("span", { className: "venue-art" }, CATEGORY_MAP[v.type]?.emoji || "\u{1F4CD}"), /* @__PURE__ */ React.createElement("span", { className: "venue-copy" }, /* @__PURE__ */ React.createElement("h3", null, v.name), /* @__PURE__ */ React.createElement("p", null, v.address?.trim() || CATEGORY_MAP[v.type]?.label), /* @__PURE__ */ React.createElement("span", { className: "venue-meta" }, /* @__PURE__ */ React.createElement("span", { className: "venue-tag" }, v.visited ? `\u2713 Discovered \xB7 ${v.visitCount} visits` : "Make a little discovery"), /* @__PURE__ */ React.createElement("span", null, userLocation ? `${(distanceMiles(userLocation.lat, userLocation.lng, v.lat, v.lng) * 1.609344).toFixed(1)} km` : ""))))))), panel === "passport" && /* @__PURE__ */ React.createElement("div", { className: "collection-content" }, /* @__PURE__ */ React.createElement("div", { className: "categories" }, /* @__PURE__ */ React.createElement("button", { className: `category ${passportScope === "global" ? "active" : ""}`, onClick: () => setPassportScope("global"), "aria-pressed": passportScope === "global" }, "Global passport \xB7 ", allStamps.length), /* @__PURE__ */ React.createElement("button", { className: `category ${passportScope === "local" ? "active" : ""}`, onClick: () => setPassportScope("local"), "aria-pressed": passportScope === "local" }, "Current area \xB7 ", localStamps.length)), passportScope === "local" && /* @__PURE__ */ React.createElement("p", { className: "scope-note" }, "Stamps within ", ((fetchCenter?.radius ?? 4e3) / 1e3).toFixed(1), " km of the search center", cityName ? ` in ${cityName}` : "", "."), isDesktop && detailCard, /* @__PURE__ */ React.createElement("div", { className: "legacy-panel passport-panel" }, /* @__PURE__ */ React.createElement(PassportPanel, { venues: displayedStamps, userLocation, onVenueClick: selectVenue }))), panel === "achievements" && /* @__PURE__ */ React.createElement("div", { className: "collection-content" }, /* @__PURE__ */ React.createElement("div", { className: "legacy-panel" }, /* @__PURE__ */ React.createElement(AchievementsPanel, { stats: visitStats }))), panel === "quests" && /* @__PURE__ */ React.createElement("div", { className: "collection-content quest-overview" }, QUEST_TYPES.map((q) => /* @__PURE__ */ React.createElement("button", { className: "venue-card", key: q.id, onClick: () => selectQuest(q.id) }, /* @__PURE__ */ React.createElement("span", { className: "venue-art" }, q.emoji), /* @__PURE__ */ React.createElement("span", { className: "venue-copy" }, /* @__PURE__ */ React.createElement("h3", null, q.label), /* @__PURE__ */ React.createElement("p", null, getCategoriesForQuest(q.id).map((c) => c.label).join(" \xB7 ")), /* @__PURE__ */ React.createElement("span", { className: "venue-tag" }, visitStats[`quest_${q.id}`] || 0, " places discovered")), /* @__PURE__ */ React.createElement("span", null, "\u2197"))))), /* @__PURE__ */ React.createElement("section", { className: "map live-map", "aria-label": "Map of venues and your location", hidden: panel === "achievements" || panel === "quests" }, /* @__PURE__ */ React.createElement(PreviewMap, { venues: panel === "passport" ? displayedStamps.filter((v) => Number.isFinite(v.lat) && Number.isFinite(v.lng)) : typeVenues, userLocation, selectedVenue, fetchCenter, fetchZoom: fetchZoomRef.current, onSearchArea: setSearchArea, isMobile: !isDesktop, onVenueClick: selectVenue, dark }), !isDesktop && detailCard, /* @__PURE__ */ React.createElement("div", { className: "map-top" }, /* @__PURE__ */ React.createElement("div", { className: "map-label" }, "\u2316 ", cityName || "Your search area"), panel !== "passport" && /* @__PURE__ */ React.createElement("button", { className: "search-area", disabled: loading || !fetchCenter, onClick: () => {
+  } }, c.emoji, " ", c.label))), isDesktop && detailCard, /* @__PURE__ */ React.createElement("div", { className: "list-heading" }, /* @__PURE__ */ React.createElement("strong", null, loading ? "Finding nearby places\u2026" : `${typeVisited} of ${typeVenues.length} visited`), /* @__PURE__ */ React.createElement("span", null, completionPct, "% discovered")), /* @__PURE__ */ React.createElement("div", { className: "venue-list", id: "venue-list", "aria-busy": loading }, searchError && /* @__PURE__ */ React.createElement("div", { className: "empty", role: "alert" }, searchError, /* @__PURE__ */ React.createElement("button", { className: "category", onClick: () => setSearchRetry((n) => n + 1) }, "Retry")), !loading && !searchError && !typeVenues.length && /* @__PURE__ */ React.createElement("div", { className: "empty" }, "No places found here. Move the map and search another area."), typeVenues.map((v) => /* @__PURE__ */ React.createElement("button", { key: v.id, className: `venue-card ${selectedVenue?.id === v.id ? "selected" : ""}`, "aria-pressed": selectedVenue?.id === v.id, onClick: () => selectVenue(v) }, /* @__PURE__ */ React.createElement("span", { className: "venue-art" }, CATEGORY_MAP[v.type]?.emoji || "\u{1F4CD}"), /* @__PURE__ */ React.createElement("span", { className: "venue-copy" }, /* @__PURE__ */ React.createElement("h3", null, v.name), /* @__PURE__ */ React.createElement("p", null, v.address?.trim() || CATEGORY_MAP[v.type]?.label), /* @__PURE__ */ React.createElement("span", { className: "venue-meta" }, /* @__PURE__ */ React.createElement("span", { className: "venue-tag" }, v.visited ? `\u2713 Discovered \xB7 ${v.visitCount} visits` : "Make a little discovery"), /* @__PURE__ */ React.createElement("span", null, userLocation ? `${(distanceMiles(userLocation.lat, userLocation.lng, v.lat, v.lng) * 1.609344).toFixed(1)} km` : ""))))))), panel === "passport" && /* @__PURE__ */ React.createElement("div", { className: "collection-content" }, passportSwitcher, isDesktop && detailCard, /* @__PURE__ */ React.createElement("div", { className: "legacy-panel passport-panel" }, /* @__PURE__ */ React.createElement(PassportPanel, { venues: displayedStamps, userLocation, onVenueClick: selectVenue }))), panel === "achievements" && /* @__PURE__ */ React.createElement("div", { className: "collection-content" }, /* @__PURE__ */ React.createElement("div", { className: "legacy-panel" }, /* @__PURE__ */ React.createElement(AchievementsPanel, { stats: visitStats }))), panel === "quests" && /* @__PURE__ */ React.createElement("div", { className: "collection-content quest-overview" }, questSwitcher, isDesktop && detailCard, QUEST_TYPES.map((q) => /* @__PURE__ */ React.createElement("button", { className: "venue-card", key: q.id, onClick: () => selectQuest(q.id) }, /* @__PURE__ */ React.createElement("span", { className: "venue-art" }, q.emoji), /* @__PURE__ */ React.createElement("span", { className: "venue-copy" }, /* @__PURE__ */ React.createElement("h3", null, q.label), /* @__PURE__ */ React.createElement("p", null, getCategoriesForQuest(q.id).map((c) => c.label).join(" \xB7 ")), /* @__PURE__ */ React.createElement("span", { className: "venue-tag" }, questCounts[q.id] || 0, " places discovered")), /* @__PURE__ */ React.createElement("span", null, "\u2197"))))), /* @__PURE__ */ React.createElement("section", { className: "map live-map", "aria-label": "Map of venues and your location", hidden: panel === "achievements" || (panel === "quests" && !isDesktop) }, /* @__PURE__ */ React.createElement(PreviewMap, { passportCenter, venues: ["passport", "quests"].includes(panel) ? (panel === "passport" ? displayedStamps : questVenues).filter((v) => Number.isFinite(v.lat) && Number.isFinite(v.lng)) : typeVenues, userLocation, selectedVenue, fetchCenter, fetchZoom: fetchZoomRef.current, onSearchArea: setSearchArea, isMobile: !isDesktop, onVenueClick: selectVenue, dark }), !isDesktop && detailCard, /* @__PURE__ */ React.createElement("div", { className: "map-top" }, /* @__PURE__ */ React.createElement("div", { className: "map-label" }, "\u2316 ", (panel === "quests" ? selectedQuestCity?.label || "Global discoveries" : panel === "passport" && selectedCityPassport ? selectedCityPassport.label : cityName) || "Your search area"), panel === "list" && /* @__PURE__ */ React.createElement("button", { className: "search-area", disabled: loading || !fetchCenter, onClick: () => {
     if (searchArea) handleSearchArea();
     else setSearchRetry((n) => n + 1);
   } }, loading ? "Finding venues\u2026" : "\u21BB Search this area")))), /* @__PURE__ */ React.createElement("div", { className: "footer" }, /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("strong", null, "Take the scenic route."), " The best discoveries aren't always planned."), /* @__PURE__ */ React.createElement("span", null, "City Quest / a field guide to your city")))), checkinModal && selectedVenue && /* @__PURE__ */ React.createElement("div", { className: "modal-backdrop", onClick: (e) => {
