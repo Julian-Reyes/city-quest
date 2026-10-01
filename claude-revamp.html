@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>City Quest · Revamp mockup</title>
+<style>
+  /* Standalone dummy mockup. Nothing here is imported by the app. */
+  :root {
+    --night:#10201c; --night2:#172c26; --card:#1d3730; --line:#2c4a41;
+    --paper:#f6efdf; --paper2:#ece1c8; --ink:#1c2b25; --ink-soft:#6b705f;
+    --gold:#f2b84b; --coral:#ee6c4d; --mint:#7fd6b0; --sky:#7cc3e8; --plum:#b58ae0;
+    --text:#f3efe3; --muted:#9db3a9;
+  }
+  * { box-sizing:border-box; margin:0; }
+  body { background:#0b1512; color:var(--text); font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; padding:32px 16px 64px;
+    background-image:radial-gradient(circle at 20% 0%,#1b3a31 0,transparent 45%),radial-gradient(circle at 90% 100%,#2a2a1a 0,transparent 40%); }
+  button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+  button:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+  .serif { font-family:Georgia,"Times New Roman",serif; }
+
+  .hero { text-align:center; max-width:640px; margin:0 auto 36px; }
+  .hero .tag { font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--gold); font-weight:700; }
+  .hero h1 { font-family:Georgia,serif; font-weight:400; font-size:40px; letter-spacing:-1px; margin:8px 0; }
+  .hero p { color:var(--muted); }
+
+  .board { display:grid; grid-template-columns:repeat(auto-fit,380px); justify-content:center; gap:44px 36px; max-width:1700px; margin:auto; }
+  .slot { display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .slot > label { font-size:11px; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
+
+  /* phone */
+  .phone { width:380px; height:780px; border-radius:46px; padding:10px; background:#050b09; border:1px solid #2a3b35; box-shadow:0 30px 60px #0008, inset 0 0 0 2px #1a2723; }
+  .screen { position:relative; height:100%; border-radius:37px; overflow:hidden; background:var(--night); display:flex; flex-direction:column; }
+  .notch { position:absolute; top:9px; left:50%; transform:translateX(-50%); width:110px; height:26px; border-radius:20px; background:#000; z-index:20; }
+  .status { height:46px; flex:none; display:flex; justify-content:space-between; align-items:flex-end; padding:0 28px 4px; font-size:12px; font-weight:600; z-index:10; }
+  .scroll { flex:1; overflow-y:auto; scrollbar-width:none; padding-bottom:92px; }
+  .scroll::-webkit-scrollbar { display:none; }
+
+  /* nav */
+  .nav { position:absolute; left:14px; right:14px; bottom:14px; height:64px; border-radius:22px; background:#0c1815ee; backdrop-filter:blur(14px); border:1px solid var(--line); display:flex; justify-content:space-around; align-items:center; z-index:15; }
+  .nav button { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:10px; color:var(--muted); padding:6px 12px; border-radius:14px; }
+  .nav button span { font-size:19px; line-height:1; }
+  .nav button.on { color:var(--gold); background:#f2b84b1a; }
+
+  /* shared bits */
+  .pad { padding:0 20px; }
+  .eyebrow { font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--gold); font-weight:700; }
+  h2.title { font-family:Georgia,serif; font-weight:400; font-size:28px; letter-spacing:-.8px; line-height:1.15; margin-top:4px; }
+  .chip { display:inline-flex; align-items:center; gap:5px; padding:6px 12px; border-radius:20px; background:var(--card); border:1px solid var(--line); font-size:12px; white-space:nowrap; }
+  .chip.on { background:var(--gold); color:#2a1d00; border-color:var(--gold); font-weight:700; }
+  .row { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding:0 20px; }
+  .row::-webkit-scrollbar { display:none; }
+  .bar { height:7px; border-radius:7px; background:#ffffff14; overflow:hidden; }
+  .bar i { display:block; height:100%; border-radius:7px; background:linear-gradient(90deg,var(--gold),var(--coral)); }
+
+  /* ---------- Screen 1: Explore ---------- */
+  .map { position:absolute; inset:0; background:
+      radial-gradient(circle at 30% 30%,#1f4237 0,transparent 35%),
+      radial-gradient(circle at 75% 60%,#233a45 0,transparent 30%), #14281f; }
+  .map svg { position:absolute; inset:0; width:100%; height:100%; }
+  .pin { position:absolute; width:38px; height:38px; border-radius:50% 50% 50% 4px; transform:rotate(-45deg); display:grid; place-items:center; border:2px solid #fff3; box-shadow:0 6px 14px #0007; }
+  .pin b { transform:rotate(45deg); font-size:17px; font-weight:400; }
+  .pin.visited { background:var(--mint); }
+  .pin.new { background:var(--coral); }
+  .pin.near { background:var(--gold); width:46px; height:46px; box-shadow:0 0 0 8px #f2b84b33,0 0 0 18px #f2b84b14; }
+  .me { position:absolute; left:48%; top:55%; width:16px; height:16px; border-radius:50%; background:var(--sky); border:3px solid #fff; box-shadow:0 0 0 12px #7cc3e833; }
+  .topbar { position:absolute; top:52px; left:14px; right:14px; z-index:5; display:flex; flex-direction:column; gap:10px; }
+  .search { display:flex; align-items:center; gap:10px; height:46px; padding:0 16px; border-radius:16px; background:#0c1815ee; border:1px solid var(--line); color:var(--muted); }
+  .search .xp { margin-left:auto; color:var(--gold); font-weight:700; font-size:12px; }
+  .sheet { position:absolute; left:0; right:0; bottom:0; z-index:12; padding:10px 16px 94px; border-radius:28px 28px 0 0; background:linear-gradient(#18322bf5,#10201cfa); border-top:1px solid var(--line); }
+  .grab { width:40px; height:4px; border-radius:4px; background:#ffffff33; margin:0 auto 14px; }
+  .venue { display:flex; gap:14px; }
+  .venue .ph { width:84px; height:84px; flex:none; border-radius:18px; background:linear-gradient(135deg,#e9a25a,#b8452d); display:grid; place-items:center; font-size:38px; }
+  .venue h3 { font-size:18px; font-weight:650; letter-spacing:-.3px; }
+  .venue small { color:var(--muted); }
+  .rate { color:var(--gold); font-size:12px; margin-top:3px; }
+  .cta { margin-top:14px; width:100%; height:50px; border-radius:16px; background:linear-gradient(135deg,var(--gold),#f08f3c); color:#2a1d00; font-weight:800; font-size:15px; letter-spacing:.2px; box-shadow:0 8px 22px #f2b84b33; }
+  .cta small { font-weight:600; opacity:.7; margin-left:6px; }
+
+  /* ---------- Screen 2: Quests ---------- */
+  .streak { margin:16px 20px 0; padding:16px; border-radius:22px; background:linear-gradient(135deg,#ee6c4d,#c2412d); display:flex; align-items:center; gap:14px; }
+  .streak .flame { font-size:38px; }
+  .streak strong { font-size:22px; display:block; line-height:1.1; }
+  .streak small { opacity:.85; }
+  .quest-card { margin:12px 20px 0; padding:16px; border-radius:22px; background:var(--card); border:1px solid var(--line); }
+  .quest-card header { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+  .quest-card .ic { width:46px; height:46px; border-radius:15px; display:grid; place-items:center; font-size:24px; background:#ffffff12; }
+  .quest-card h4 { font-size:15px; font-weight:650; }
+  .quest-card header small { color:var(--muted); }
+  .quest-card .pct { margin-left:auto; font-weight:800; color:var(--gold); }
+  .steps { display:flex; justify-content:space-between; margin-top:10px; font-size:11px; color:var(--muted); }
+  .steps .done { color:var(--mint); }
+  .reward { display:inline-block; margin-top:10px; font-size:11px; padding:4px 10px; border-radius:10px; background:#7fd6b01a; color:var(--mint); }
+
+  /* ---------- Passport (city + global) ---------- */
+  .pp-scroll { background:var(--night); }
+  .switcher { display:flex; gap:6px; margin:14px 20px 0; padding:5px; border-radius:16px; background:#0c1815; border:1px solid var(--line); }
+  .switcher button { flex:1; padding:9px 0; border-radius:12px; font-size:12px; font-weight:600; color:var(--muted); }
+  .switcher button.on { background:var(--paper); color:var(--ink); }
+  .book { margin:16px 20px 0; border-radius:22px; padding:18px 16px 16px; background:var(--paper); color:var(--ink); position:relative; overflow:hidden;
+    background-image:repeating-linear-gradient(0deg,transparent 0 27px,#0000000a 27px 28px); box-shadow:0 14px 30px #0006; }
+  .book::before { content:""; position:absolute; left:0; top:0; bottom:0; width:10px; background:repeating-linear-gradient(0deg,#c9bb97 0 8px,#bcae88 8px 10px); }
+  .book > * { position:relative; }
+  .book .hd { display:flex; justify-content:space-between; align-items:flex-start; padding-left:8px; }
+  .book .hd .eyebrow { color:var(--coral); }
+  .book .hd h3 { font-family:Georgia,serif; font-weight:400; font-size:26px; letter-spacing:-.8px; line-height:1.1; }
+  .book .seal { width:54px; height:54px; border-radius:50%; border:2px dashed var(--coral); color:var(--coral); display:grid; place-items:center; text-align:center; font-size:9px; font-weight:800; line-height:1.1; transform:rotate(-12deg); }
+  .book .seal b { font-size:16px; display:block; }
+  .stamps { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:16px 0 0 8px; }
+  .stamp { aspect-ratio:1; border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:6px; border:2px solid; font-size:10px; font-weight:700; line-height:1.15; gap:3px; }
+  .stamp .e { font-size:24px; }
+  .stamp small { font-weight:500; opacity:.7; font-size:9px; }
+  .stamp.s1 { color:#b3412a; border-color:#b3412a; transform:rotate(-4deg); }
+  .stamp.s2 { color:#2c7a5e; border-color:#2c7a5e; transform:rotate(3deg); border-radius:50%; }
+  .stamp.s3 { color:#2b6a95; border-color:#2b6a95; transform:rotate(-2deg); border-style:double; border-width:4px; }
+  .stamp.s4 { color:#7a4fa6; border-color:#7a4fa6; transform:rotate(5deg); }
+  .stamp.s5 { color:#a8741a; border-color:#a8741a; transform:rotate(-5deg); border-radius:50%; }
+  .stamp.locked { color:#0000003a; border-color:#00000020; border-style:dashed; transform:none; }
+  .stamp.locked .e { filter:grayscale(1) opacity(.3); }
+  .stats3 { display:grid; grid-template-columns:repeat(3,1fr); margin:14px 20px 0; gap:10px; }
+  .stat { padding:12px; border-radius:16px; background:var(--card); border:1px solid var(--line); text-align:center; }
+  .stat strong { display:block; font-size:22px; font-family:Georgia,serif; font-weight:400; }
+  .stat small { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; }
+  .section { margin:22px 20px 10px; display:flex; justify-content:space-between; align-items:baseline; }
+  .section h4 { font-size:15px; font-weight:650; }
+  .section a { font-size:12px; color:var(--gold); text-decoration:none; }
+  .city { display:flex; align-items:center; gap:14px; margin:0 20px 10px; padding:12px; border-radius:18px; background:var(--card); border:1px solid var(--line); }
+  .city .skyline { width:60px; height:60px; border-radius:16px; display:grid; place-items:center; font-size:30px; }
+  .city h5 { font-size:15px; font-weight:650; }
+  .city small { color:var(--muted); font-size:12px; }
+  .city .bar { margin-top:7px; }
+  .city .ct { margin-left:auto; text-align:right; font-family:Georgia,serif; font-size:20px; }
+  .city .ct small { display:block; font-family:inherit; font-size:10px; }
+
+  .panel { display:none; } .panel.on { display:block; }
+
+  /* ---------- Achievements ---------- */
+  .ring { width:120px; height:120px; border-radius:50%; margin:18px auto 6px; display:grid; place-items:center; background:conic-gradient(var(--gold) 0 62%,#ffffff14 62% 100%); }
+  .ring div { width:100px; height:100px; border-radius:50%; background:var(--night); display:grid; place-items:center; text-align:center; line-height:1.1; }
+  .ring strong { font-family:Georgia,serif; font-size:30px; font-weight:400; }
+  .ring small { font-size:10px; color:var(--muted); display:block; }
+  .badges { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; padding:0 20px; }
+  .badge { text-align:center; font-size:11px; }
+  .badge .hex { width:78px; height:78px; margin:0 auto 6px; display:grid; place-items:center; font-size:32px; clip-path:polygon(50% 0,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%); }
+  .badge.gold .hex { background:linear-gradient(135deg,#f9d77e,#d98d1f); }
+  .badge.silver .hex { background:linear-gradient(135deg,#e8eeee,#8da0a0); }
+  .badge.bronze .hex { background:linear-gradient(135deg,#f0b48a,#a0522d); }
+  .badge.lock .hex { background:#ffffff10; filter:grayscale(1) opacity(.45); }
+  .badge.lock { color:var(--muted); }
+  .badge b { display:block; font-weight:650; }
+  .badge small { color:var(--muted); font-size:10px; }
+
+  footer { text-align:center; margin-top:40px; color:var(--muted); font-size:12px; }
+  @media (max-width:420px) { .board { grid-template-columns:380px; } body { padding:20px 0; overflow-x:auto; } }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="tag">Mockup · not wired to data</div>
+  <h1>City Quest, reimagined</h1>
+  <p>A dark, night-map explorer with a warm paper passport. Gold means progress, coral means something new to find, mint means you've been there.</p>
+</div>
+
+<div class="board">
+
+  <!-- 1. EXPLORE -->
+  <div class="slot">
+    <label>1 · Explore</label>
+    <div class="phone"><div class="screen">
+      <div class="notch"></div>
+      <div class="map">
+        <svg viewBox="0 0 360 760" preserveAspectRatio="none" aria-hidden="true">
+          <g fill="none" stroke="#2a4b40" stroke-width="10" stroke-linecap="round">
+            <path d="M-10 180 C120 160 200 260 380 220"/><path d="M60 -10 C90 200 40 400 120 780"/><path d="M-10 480 C150 430 250 520 380 440"/><path d="M260 -10 C230 200 300 400 250 780"/>
+          </g>
+          <path d="M-10 620 C100 560 180 640 380 580 L380 780 L-10 780Z" fill="#1c3c4a" opacity=".7"/>
+        </svg>
+        <div class="pin visited" style="left:60px;top:230px"><b>☕</b></div>
+        <div class="pin new" style="left:250px;top:200px"><b>🍜</b></div>
+        <div class="pin visited" style="left:290px;top:360px"><b>🌳</b></div>
+        <div class="pin new" style="left:110px;top:410px"><b>🎨</b></div>
+        <div class="pin near" style="left:165px;top:300px"><b>🥐</b></div>
+        <div class="me"></div>
+      </div>
+      <div class="status" style="position:relative"><span>9:41</span><span>●●● 5G</span></div>
+      <div class="topbar" style="top:48px">
+        <div class="search">🔍 Search Portland, OR <span class="xp">⚡ 1,240 XP</span></div>
+        <div class="row" style="padding:0;margin:0 -2px">
+          <button class="chip on">All</button><button class="chip">☕ Coffee</button><button class="chip">🍜 Food</button><button class="chip">🎨 Culture</button><button class="chip">🌳 Parks</button>
+        </div>
+      </div>
+      <div style="flex:1"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="venue">
+          <div class="ph">🥐</div>
+          <div>
+            <div class="eyebrow">42 m away · New</div>
+            <h3>Le Pain Doré</h3>
+            <small>Bakery · Pearl District</small>
+            <div class="rate">★★★★★ 4.7 <span style="color:var(--muted)">· $$ · Open till 6pm</span></div>
+          </div>
+        </div>
+        <button class="cta">Check in <small>+60 XP · Baker's Dozen 3/5</small></button>
+      </div>
+      <nav class="nav">
+        <button class="on"><span>🧭</span>Explore</button><button><span>🎯</span>Quests</button><button><span>📘</span>Passport</button><button><span>🏅</span>Badges</button>
+      </nav>
+    </div></div>
+  </div>
+
+  <!-- 2. QUESTS -->
+  <div class="slot">
+    <label>2 · Quests</label>
+    <div class="phone"><div class="screen">
+      <div class="notch"></div>
+      <div class="status"><span>9:41</span><span>●●● 5G</span></div>
+      <div class="scroll">
+        <div class="pad">
+          <div class="eyebrow">Portland · Season 2</div>
+          <h2 class="title">Today's quests</h2>
+        </div>
+        <div class="streak"><div class="flame">🔥</div><div><strong>6-day streak</strong><small>Check in anywhere today to keep it alive</small></div></div>
+        <div class="row" style="margin-top:16px">
+          <button class="chip on">Active</button><button class="chip">☕ Coffee Crawl</button><button class="chip">🍔 Foodie</button><button class="chip">🌲 Outdoors</button><button class="chip">Done</button>
+        </div>
+        <div class="quest-card">
+          <header><div class="ic">☕</div><div><h4>Coffee Crawl</h4><small>Visit 5 different cafés</small></div><div class="pct">80%</div></header>
+          <div class="bar"><i style="width:80%"></i></div>
+          <div class="steps"><span class="done">✓ Heart</span><span class="done">✓ Coava</span><span class="done">✓ Stumptown</span><span class="done">✓ Case Study</span><span>○ ?</span></div>
+          <span class="reward">Reward · "Bean Counter" badge + 200 XP</span>
+        </div>
+        <div class="quest-card">
+          <header><div class="ic">🎨</div><div><h4>Gallery Hopper</h4><small>3 museums or galleries</small></div><div class="pct">33%</div></header>
+          <div class="bar"><i style="width:33%"></i></div>
+          <div class="steps"><span class="done">✓ PAM</span><span>○ ?</span><span>○ ?</span></div>
+          <span class="reward">Reward · "Patron" badge + 150 XP</span>
+        </div>
+        <div class="quest-card">
+          <header><div class="ic">🌳</div><div><h4>Touch Grass</h4><small>5 parks or trails</small></div><div class="pct">20%</div></header>
+          <div class="bar"><i style="width:20%"></i></div>
+          <div class="steps"><span class="done">✓ Forest Park</span><span>○</span><span>○</span><span>○</span><span>○</span></div>
+          <span class="reward">Reward · "Ranger" badge + 250 XP</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <button><span>🧭</span>Explore</button><button class="on"><span>🎯</span>Quests</button><button><span>📘</span>Passport</button><button><span>🏅</span>Badges</button>
+      </nav>
+    </div></div>
+  </div>
+
+  <!-- 3. CITY PASSPORT -->
+  <div class="slot">
+    <label>3 · City passport</label>
+    <div class="phone"><div class="screen pp-scroll">
+      <div class="notch"></div>
+      <div class="status"><span>9:41</span><span>●●● 5G</span></div>
+      <div class="scroll">
+        <div class="pad"><div class="eyebrow">Passport</div><h2 class="title">Portland, OR</h2></div>
+        <div class="switcher"><button class="on">Portland</button><button>All cities</button></div>
+        <div class="book">
+          <div class="hd">
+            <div><div class="eyebrow">Official visitor record</div><h3>Portland<br>Edition</h3></div>
+            <div class="seal"><div><b>23</b>STAMPS</div></div>
+          </div>
+          <div class="stamps">
+            <div class="stamp s1"><span class="e">☕</span>Heart Coffee<small>Sep 28</small></div>
+            <div class="stamp s2"><span class="e">🥐</span>Pain Doré<small>Sep 30</small></div>
+            <div class="stamp s3"><span class="e">🌳</span>Forest Park<small>Sep 14</small></div>
+            <div class="stamp s4"><span class="e">🎨</span>PAM<small>Sep 9</small></div>
+            <div class="stamp s5"><span class="e">📚</span>Powell's<small>Aug 30</small></div>
+            <div class="stamp locked"><span class="e">🍜</span>? ? ?</div>
+          </div>
+        </div>
+        <div class="stats3">
+          <div class="stat"><strong>23</strong><small>Venues</small></div>
+          <div class="stat"><strong>8</strong><small>Categories</small></div>
+          <div class="stat"><strong>14%</strong><small>Explored</small></div>
+        </div>
+        <div class="section"><h4>By category</h4><a href="#">See all</a></div>
+        <div class="city"><div class="skyline" style="background:#e9a25a33">☕</div><div style="flex:1"><h5>Coffee</h5><small>8 of 14 nearby</small><div class="bar"><i style="width:57%"></i></div></div><div class="ct">8</div></div>
+        <div class="city"><div class="skyline" style="background:#ee6c4d33">🍜</div><div style="flex:1"><h5>Food & drink</h5><small>6 of 30 nearby</small><div class="bar"><i style="width:20%"></i></div></div><div class="ct">6</div></div>
+        <div class="city"><div class="skyline" style="background:#7fd6b033">🌳</div><div style="flex:1"><h5>Outdoors</h5><small>4 of 9 nearby</small><div class="bar"><i style="width:44%"></i></div></div><div class="ct">4</div></div>
+      </div>
+      <nav class="nav">
+        <button><span>🧭</span>Explore</button><button><span>🎯</span>Quests</button><button class="on"><span>📘</span>Passport</button><button><span>🏅</span>Badges</button>
+      </nav>
+    </div></div>
+  </div>
+
+  <!-- 4. GLOBAL PASSPORT -->
+  <div class="slot">
+    <label>4 · Global passport</label>
+    <div class="phone"><div class="screen pp-scroll">
+      <div class="notch"></div>
+      <div class="status"><span>9:41</span><span>●●● 5G</span></div>
+      <div class="scroll">
+        <div class="pad"><div class="eyebrow">Passport</div><h2 class="title">Julian's world</h2></div>
+        <div class="switcher"><button>Portland</button><button class="on">All cities</button></div>
+        <div class="book" style="background-color:#1f4a58;color:#f6efdf;background-image:radial-gradient(circle at 80% 20%,#ffffff14,transparent 50%)">
+          <div class="hd">
+            <div><div class="eyebrow" style="color:var(--gold)">Explorer · Level 7</div><h3>Global<br>Passport</h3></div>
+            <div class="seal" style="color:var(--gold);border-color:var(--gold)"><div><b>4</b>CITIES</div></div>
+          </div>
+          <div style="margin:18px 0 0 8px;display:flex;justify-content:space-between;font-size:12px"><span>1,240 / 1,500 XP</span><span style="color:var(--gold)">Level 8 →</span></div>
+          <div class="bar" style="margin:6px 0 0 8px"><i style="width:82%"></i></div>
+          <div style="display:flex;gap:14px;margin:18px 0 0 8px;font-size:12px">
+            <span>📍 61 venues</span><span>🏅 19 badges</span><span>🔥 6 days</span>
+          </div>
+        </div>
+        <div class="section"><h4>Your cities</h4><a href="#">Add city</a></div>
+        <div class="city"><div class="skyline" style="background:#7fd6b033">🌲</div><div style="flex:1"><h5>Portland, OR</h5><small>Last visit today</small><div class="bar"><i style="width:14%"></i></div></div><div class="ct">23<small>stamps</small></div></div>
+        <div class="city"><div class="skyline" style="background:#7cc3e833">🌉</div><div style="flex:1"><h5>San Francisco, CA</h5><small>Last visit Aug 12</small><div class="bar"><i style="width:22%"></i></div></div><div class="ct">19<small>stamps</small></div></div>
+        <div class="city"><div class="skyline" style="background:#b58ae033">🗽</div><div style="flex:1"><h5>New York, NY</h5><small>Last visit Jun 3</small><div class="bar"><i style="width:9%"></i></div></div><div class="ct">14<small>stamps</small></div></div>
+        <div class="city"><div class="skyline" style="background:#f2b84b33">🌴</div><div style="flex:1"><h5>Honolulu, HI</h5><small>Last visit Jan 20</small><div class="bar"><i style="width:6%"></i></div></div><div class="ct">5<small>stamps</small></div></div>
+        <div class="section"><h4>Latest stamps, anywhere</h4></div>
+        <div class="row">
+          <div class="chip">☕ Heart · PDX</div><div class="chip">🥐 Pain Doré · PDX</div><div class="chip">🌉 Ferry Bldg · SF</div><div class="chip">🗽 MoMA · NYC</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <button><span>🧭</span>Explore</button><button><span>🎯</span>Quests</button><button class="on"><span>📘</span>Passport</button><button><span>🏅</span>Badges</button>
+      </nav>
+    </div></div>
+  </div>
+
+  <!-- 5. ACHIEVEMENTS -->
+  <div class="slot">
+    <label>5 · Achievements</label>
+    <div class="phone"><div class="screen">
+      <div class="notch"></div>
+      <div class="status"><span>9:41</span><span>●●● 5G</span></div>
+      <div class="scroll">
+        <div class="pad"><div class="eyebrow">Badges</div><h2 class="title">19 of 31 unlocked</h2></div>
+        <div class="ring"><div><span><strong>62%</strong><small>complete</small></span></div></div>
+        <div class="row" style="margin:14px 0 16px"><button class="chip on">All</button><button class="chip">Earned</button><button class="chip">In progress</button><button class="chip">Locked</button></div>
+        <div class="badges">
+          <div class="badge gold"><div class="hex">☕</div><b>Bean Counter</b><small>5 cafés</small></div>
+          <div class="badge silver"><div class="hex">🥐</div><b>Baker's Dozen</b><small>3 / 5 bakeries</small></div>
+          <div class="badge bronze"><div class="hex">🌳</div><b>Ranger</b><small>1 / 5 parks</small></div>
+          <div class="badge gold"><div class="hex">🗺️</div><b>Cartographer</b><small>3 cities</small></div>
+          <div class="badge silver"><div class="hex">🎨</div><b>Patron</b><small>1 / 3 galleries</small></div>
+          <div class="badge gold"><div class="hex">🔥</div><b>Week Warrior</b><small>7-day streak</small></div>
+          <div class="badge lock"><div class="hex">🌙</div><b>Night Owl</b><small>Check in after 10pm</small></div>
+          <div class="badge lock"><div class="hex">🍺</div><b>Hop Head</b><small>5 breweries</small></div>
+          <div class="badge lock"><div class="hex">✈️</div><b>Globetrotter</b><small>10 cities</small></div>
+        </div>
+      </div>
+      <nav class="nav">
+        <button><span>🧭</span>Explore</button><button><span>🎯</span>Quests</button><button><span>📘</span>Passport</button><button class="on"><span>🏅</span>Badges</button>
+      </nav>
+    </div></div>
+  </div>
+
+</div>
+
+<footer>Design notes: Georgia for headings (journal feel), system sans for UI, paper-textured passport pages with rotated ink stamps, bottom tab bar replaces the top quest strip.</footer>
+
+<script>
+  // Tiny interactivity so the mockup feels alive: switcher + chip toggles.
+  document.querySelectorAll('.switcher').forEach(sw => sw.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    sw.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  }));
+  document.querySelectorAll('.row').forEach(r => r.addEventListener('click', e => {
+    const c = e.target.closest('button.chip'); if (!c) return;
+    r.querySelectorAll('button.chip').forEach(x => x.classList.toggle('on', x === c));
+  }));
+</script>
+</body>
+</html>
