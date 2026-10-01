@@ -35,8 +35,8 @@ export const VENUE_CATEGORIES = [
   { id: "restaurant", quest: "night_out", label: "Food", emoji: "🍔", color: "#10b981", osmTag: "amenity", osmValue: "restaurant" },
 
   // ── Day Explorer ──
-  { id: "park", quest: "day_explorer", label: "Park", emoji: "🌳", color: "#16a34a", osmTag: "leisure", osmValue: ["park", "garden", "playground"], ghostFilter: false },
   { id: "cafe", quest: "day_explorer", label: "Cafe", emoji: "☕", color: "#92400e", osmTag: "amenity", osmValue: ["cafe", "bakery"] },
+  { id: "park", quest: "day_explorer", label: "Park", emoji: "🌳", color: "#16a34a", osmTag: "leisure", osmValue: ["park", "garden", "playground"], ghostFilter: false },
   { id: "ice_cream", quest: "day_explorer", label: "Ice Cream", emoji: "🍦", color: "#ec4899", osmTag: "amenity", osmValue: "ice_cream" },
   { id: "viewpoint", quest: "day_explorer", label: "Viewpoint", emoji: "🏔️", color: "#0ea5e9", osmTag: "tourism", osmValue: "viewpoint", ghostFilter: false },
   { id: "beach", quest: "day_explorer", label: "Beach", emoji: "🏖️", color: "#fbbf24", osmTag: "natural", osmValue: "beach", ghostFilter: false },

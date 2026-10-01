@@ -63,6 +63,11 @@ export async function fetchVenues(lat, lng, type, signal, radius = 4000) {
 
   if (!res.ok) throw new Error(`Overpass API error: ${res.status}`);
   const data = await res.json();
+  // Overpass can report a timeout/runtime error in an HTTP 200 response.
+  // Such responses must not be cached as a successful empty search.
+  if (data.remark || !Array.isArray(data.elements)) {
+    throw new Error(data.remark || "Invalid Overpass response");
+  }
   return data.elements
     .filter((el) => el.tags?.name && (el.lat || el.center?.lat))
     .map((el) => ({

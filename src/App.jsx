@@ -42,6 +42,7 @@ import {
   backfillVisitTypes,
 } from "./api/visits";
 import { resizePhoto } from "./utils/photo";
+import { distanceMiles } from "./utils/distance";
 
 // ── Hooks ──
 import { useIsDesktop } from "./hooks/useIsDesktop";
@@ -121,13 +122,16 @@ function enrichAddress(address, suffix) {
 export default function App() {
   const isDesktop = useIsDesktop();
   const [activeQuest, setActiveQuest] = useState("day_explorer");
-  const [activeCategory, setActiveCategory] = useState("park");
+  const [activeCategory, setActiveCategory] = useState("cafe");
   const [venues, setVenues] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
+  const [fetchCenter, setFetchCenter] = useState(null);
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [panel, setPanel] = useState("list"); // list | achievements | passport
   const [sheetState, setSheetState] = useState("peek"); // mobile: peek | expanded | collapsed
   const [loading, setLoading] = useState(true);
+  const [searchError, setSearchError] = useState(null);
+  const [searchRetry, setSearchRetry] = useState(0);
   const [checkinModal, setCheckinModal] = useState(false);
   const [note, setNote] = useState("");
   const [photo, setPhoto] = useState(null);
@@ -140,6 +144,7 @@ export default function App() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const fileInputRef = useRef(null);
   const venueCacheRef = useRef({});
+  const completedSearchRef = useRef({});
   const visitsRef = useRef(getVisits());
   const [visitStats, setVisitStats] = useState(() => getVisitStats());
 
@@ -170,6 +175,11 @@ export default function App() {
   const typeVenues = useMemo(() => {
     const filtered = venues.filter((v) => {
       if (v.type !== activeCategory) return false;
+      // Saved visits and cached searches span cities; discovery progress is local.
+      if (!fetchCenter || !Number.isFinite(v.lat) || !Number.isFinite(v.lng))
+        return false;
+      const distance = distanceMiles(fetchCenter.lat, fetchCenter.lng, v.lat, v.lng);
+      if (distance * 1609.344 > (fetchCenter.radius ?? 4000)) return false;
       // Hide ghost venues: permanently closed always hidden; no Google match only hidden if no OSM address
       if (v.googleData?.closed) return false;
       if (v.googleData === null && (!v.address || v.address.trim() === ""))
@@ -184,7 +194,7 @@ export default function App() {
         (a.lng - lng) ** 2 -
         ((b.lat - lat) ** 2 + (b.lng - lng) ** 2),
     );
-  }, [venues, activeCategory, userLocation]);
+  }, [venues, activeCategory, userLocation, fetchCenter]);
   const typeVisited = typeVenues.filter((v) => v.visited).length;
 
   const passportVenues = useMemo(() => {
@@ -198,10 +208,10 @@ export default function App() {
   };
 
   // ── Track user location (blue dot + initial fetch center) ──
-  const [fetchCenter, setFetchCenter] = useState(null);
   const fetchZoomRef = useRef(14); // zoom level of last fetch (default map zoom)
   const [cityName, setCityName] = useState("");
   const [areaSuffix, setAreaSuffix] = useState("");
+  const areaSuffixRef = useRef("");
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -446,99 +456,78 @@ export default function App() {
     return filterGhostVenues(Array.from(map.values()));
   }, []);
 
-  // ── Fetch venues for active type ──
+  // ── Fetch venues for active type and search area ──
   useEffect(() => {
     if (!fetchCenter) return;
     const controller = new AbortController();
+    const radius = fetchCenter.radius ?? 4000;
+    const searchKey = `${fetchCenter.lat},${fetchCenter.lng},${radius},${searchRetry}`;
+    const cached = venueCacheRef.current[activeCategory];
 
-    if (venueCacheRef.current[activeCategory]) {
-      setVenues(venueCacheRef.current[activeCategory]);
+    setSearchError(null);
+    if (cached && completedSearchRef.current[activeCategory] === searchKey) {
+      setVenues(cached);
       setLoading(false);
       return;
     }
 
-    setLoading(true);
-    fetchVenues(fetchCenter.lat, fetchCenter.lng, activeCategory, controller.signal)
+    // Keep the map mounted during area searches so its viewport is preserved.
+    if (!fetchCenter.areaSearch || !cached) setLoading(true);
+    fetchVenues(fetchCenter.lat, fetchCenter.lng, activeCategory, controller.signal, radius)
       .then((fetched) => {
-        const filtered = filterGhostVenues(fetched);
-        const enriched = filtered.map((v) => ({
-          ...v,
-          address: enrichAddress(v.address, areaSuffix),
-        }));
-        const hydrated = hydrateVisits(enriched);
+        if (controller.signal.aborted) return;
+        const hydrated = hydrateVisits(filterGhostVenues(fetched));
         if (backfillVisitTypes(hydrated)) {
           visitsRef.current = getVisits();
           setVisitStats(getVisitStats());
         }
-        // Inject visited venues from localStorage so they show even outside search area
         const savedVisited = getVisitedVenues(activeCategory);
-        const withSaved = savedVisited.length
-          ? mergeVenues(savedVisited, hydrated)
-          : hydrated;
-        venueCacheRef.current[activeCategory] = withSaved;
-        setVenues(withSaved);
+        const existing = [...savedVisited, ...(venueCacheRef.current[activeCategory] || [])];
+        const merged = mergeVenues(existing, hydrated).map((v) => ({
+          ...v,
+          address: enrichAddress(v.address, areaSuffixRef.current),
+        }));
+        venueCacheRef.current[activeCategory] = merged;
+        completedSearchRef.current[activeCategory] = searchKey;
+        setVenues(merged);
         setLoading(false);
       })
       .catch((err) => {
-        if (err.name === "AbortError") return;
+        if (controller.signal.aborted) return;
         console.error("Failed to fetch venues:", err);
-        setVenues([]);
+        setSearchError("Couldn't load venues. Try again.");
         setLoading(false);
       });
 
     return () => controller.abort();
-  }, [activeCategory, fetchCenter]);
+  }, [activeCategory, fetchCenter, searchRetry, hydrateVisits, mergeVenues]);
 
-  // ── Search this area handler ──
+  // ── Search this area uses the same cancellable request as initial loading ──
   const handleSearchArea = useCallback(() => {
     if (!searchArea) return;
-    const controller = new AbortController();
-    setSearchArea(null);
-    const newCenter = { lat: searchArea.lat, lng: searchArea.lng };
-    setFetchCenter(newCenter);
     fetchZoomRef.current = searchArea.zoom;
-    fetchVenues(
-      newCenter.lat,
-      newCenter.lng,
-      activeCategory,
-      controller.signal,
-      searchArea.radius,
-    )
-      .then((fetched) => {
-        if (backfillVisitTypes(fetched)) {
-          visitsRef.current = getVisits();
-          setVisitStats(getVisitStats());
-        }
-        setVenues((prev) => {
-          const merged = mergeVenues(prev, fetched);
-          const enriched = merged.map((v) => ({
-            ...v,
-            address: enrichAddress(v.address, areaSuffix),
-          }));
-          venueCacheRef.current[activeCategory] = enriched;
-          return enriched;
-        });
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (err.name === "AbortError") return;
-        console.error("Failed to fetch venues:", err);
-        setLoading(false);
-      });
-  }, [searchArea, activeCategory, areaSuffix, mergeVenues]);
-
-  // ── Re-enrich addresses when areaSuffix arrives (Nominatim may resolve after venues) ──
-  useEffect(() => {
-    if (!areaSuffix) return;
-    setVenues((prev) => {
-      const updated = prev.map((v) => ({
-        ...v,
-        address: enrichAddress(v.address, areaSuffix),
-      }));
-      venueCacheRef.current[activeCategory] = updated;
-      return updated;
+    setFetchCenter({
+      lat: searchArea.lat,
+      lng: searchArea.lng,
+      radius: searchArea.radius,
+      areaSearch: true,
     });
-  }, [areaSuffix, activeCategory]);
+    setSearchArea(null);
+  }, [searchArea]);
+
+  // Enrich only completed results. Never turn a pending/failed search into a cache hit.
+  useEffect(() => {
+    areaSuffixRef.current = areaSuffix;
+    if (!areaSuffix) return;
+    const cached = venueCacheRef.current[activeCategory];
+    if (!cached || !completedSearchRef.current[activeCategory]) return;
+    const updated = cached.map((v) => ({
+      ...v,
+      address: enrichAddress(v.address, areaSuffix),
+    }));
+    venueCacheRef.current[activeCategory] = updated;
+    setVenues(updated);
+  }, [areaSuffix, activeCategory, loading]);
 
   const handleCheckin = useCallback(async () => {
     if (!selectedVenue) return;
@@ -973,6 +962,13 @@ export default function App() {
                 if (!isDesktop) setSheetState("collapsed");
               }}
             />
+          )}
+
+          {searchError && panel !== "passport" && (
+            <div role="alert" style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 600, padding: "10px 14px", borderRadius: 12, background: "#0f0f1a", color: "#fff", whiteSpace: "nowrap" }}>
+              {searchError}{" "}
+              <button onClick={() => setSearchRetry((prev) => prev + 1)} style={{ cursor: "pointer" }}>Retry</button>
+            </div>
           )}
 
           {/* SEARCH THIS AREA BUTTON */}
