@@ -2,10 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>City Quest · Desktop revamp mockup</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10201c">
+<title>City Quest · Revamp</title>
 <style>
-  /* Standalone dummy mockup (desktop). Nothing here is imported by the app. */
+  /* Revamp UI (desktop, plus a mobile layout under 640px), wired to live data by src/revamp2/app.js.
+     Nothing here is imported by index.html or ui-preview.html. */
   :root {
     --night:#10201c; --night2:#0b1512; --card:#1d3730; --line:#2c4a41;
     --paper:#f6efdf; --ink:#1c2b25;
@@ -198,34 +200,214 @@
   .toast { position:absolute; bottom:28px; left:50%; transform:translate(-50%,40px); opacity:0; padding:14px 22px; border-radius:16px; background:var(--paper); color:var(--ink); font-weight:700; box-shadow:0 14px 40px #000a; transition:.35s; z-index:50; pointer-events:none; }
   .toast.show { transform:translate(-50%,0); opacity:1; }
 
+  /* ---------- venue bottom sheet + tab bar (only shown at narrow widths) ---------- */
+  .sheet, .tabbar, .s-xp { display:none; }
+  .grab { display:block; width:100%; padding:2px 0 12px; }
+  .grab::before { content:""; display:block; width:40px; height:4px; border-radius:4px; background:#ffffff33; margin:auto; }
+  .s-venue { display:flex; gap:14px; align-items:center; }
+  .s-venue .ph { width:84px; height:84px; flex:none; border-radius:18px; display:grid; place-items:center; font-size:38px; }
+  .s-venue h3 { font-size:18px; font-weight:650; letter-spacing:-.3px; }
+  .s-venue .meta { font-size:12px; }
+  .s-venue .rate { font-size:12px; margin-top:3px; }
+  .s-venue .rate span { color:var(--muted); }
+  .sheet .cta { margin-top:14px; height:50px; font-size:15px; }
+  .sheet .nearby { display:none; max-height:34vh; overflow-y:auto; }
+  .sheet.open .nearby { display:block; }
+  .sheet .nearby h4 { margin-top:16px; }
+
+  /* ---------- live data (src/revamp2/app.js) ---------- */
+  #map { position:absolute; inset:0; z-index:0; background:#14281f; }
+  .map-ui { z-index:5; align-items:flex-start; }
+  .map-ui .filters { flex:1; min-width:0; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; padding-bottom:2px; }
+  .map-ui .filters::-webkit-scrollbar { display:none; }
+  .legend { z-index:5; }
+  .zoom button:disabled { opacity:.35; cursor:default; }
+  .leaflet-container { font:inherit; }
+  .leaflet-control-attribution { background:#0c1815cc !important; color:var(--muted) !important; font-size:10px; border-radius:8px 0 0 0; }
+  .leaflet-control-attribution a { color:var(--muted) !important; }
+  .cq-icon { background:none; border:0; }
+  .cq-icon .pin, .cq-icon .me { position:relative; left:auto; top:auto; }
+  .cq-icon .pin { border-width:2px; }
+  .cq-icon .pin.dot { width:14px; height:14px; border-radius:50%; transform:none; box-shadow:0 0 0 3px #0005; }
+  .cq-icon .pin.dot:hover { transform:scale(1.4); }
+  .area-btn, .map-status { position:absolute; top:70px; left:50%; transform:translateX(-50%); z-index:6; white-space:nowrap; }
+  .area-btn { padding:9px 16px; border-radius:20px; background:var(--paper); color:var(--ink); font-weight:700; font-size:12px; box-shadow:0 8px 22px #0007; }
+  .map-status { display:flex; align-items:center; gap:10px; padding:9px 16px; border-radius:20px; background:#0c1815ee; border:1px solid var(--line); font-size:12px; color:var(--muted); }
+  .map-status button, .empty button, .pp-note button { color:var(--gold); font-weight:700; }
+  [hidden] { display:none !important; }
+  .spin { width:12px; height:12px; border-radius:50%; border:2px solid #ffffff33; border-top-color:var(--gold); animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .search input { flex:1; min-width:0; background:none; border:0; outline:none; color:var(--text); font:inherit; }
+  .search input::placeholder { color:var(--muted); }
+  .search:focus-within { border-color:var(--gold); }
+  .muted { color:var(--muted); }
+  .empty { padding:18px; border-radius:18px; border:1px dashed var(--line); color:var(--muted); text-align:center; font-size:13px; }
+  .hero-ph { overflow:hidden; }
+  .hero-ph img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .d-list { margin-top:0; padding-top:26px; }
+  .d-back { display:inline-block; margin-bottom:6px; font-size:12px; font-weight:700; color:var(--gold); }
+  .facts { grid-template-columns:1fr 1fr; }
+  .fact strong { display:block; font-size:13px; }
+  .cta.again { background:linear-gradient(135deg,var(--mint),#4fa37a); box-shadow:0 8px 22px #7fd6b02a; }
+  .memo { margin-top:14px; padding:12px 14px; border-radius:14px; background:#f6efdf12; font-family:Georgia,serif; font-style:italic; }
+  .near b { display:block; }
+  .near small { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px; }
+  .s-venue .ph { overflow:hidden; }
+  .s-venue .ph img { width:100%; height:100%; object-fit:cover; }
+  .s-sum { display:block; width:100%; text-align:left; }
+  .s-sum h3 { font-size:18px; font-weight:650; letter-spacing:-.3px; margin:2px 0; }
+  .s-sum .meta { font-size:12px; }
+  .s-sum .bar { margin-top:10px; }
+  .qcard.complete { border-color:#7fd6b055; }
+  .qcard .steps { flex-wrap:wrap; justify-content:flex-start; gap:6px 14px; }
+  .qcard .steps button { font-size:11px; color:var(--muted); padding:0; }
+  .qcard .steps button.done { color:var(--mint); }
+  .qcard .steps button:hover { color:var(--gold); }
+  .qgrid > .empty { grid-column:1/-1; }
+  .switcher { overflow-x:auto; max-width:100%; scrollbar-width:none; }
+  .switcher::-webkit-scrollbar { display:none; }
+  .switcher button { white-space:nowrap; }
+  button.stamp { cursor:pointer; background:none; }
+  .stamp .nm { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .stamp .e img { display:block; width:36px; height:36px; border-radius:10px; object-fit:cover; }
+  .stamps.latest { grid-template-columns:repeat(4,1fr); margin-top:4px; }
+  .stamps.latest .stamp { color:var(--text); border-color:var(--line); }
+  button.city { width:100%; text-align:left; transition:.15s; }
+  button.city:hover { border-color:var(--gold); }
+  .pp-note { color:var(--muted); font-size:12px; }
+  .badge.silver { color:var(--text); }
+
+  dialog.ci { margin:auto; width:min(420px, calc(100% - 32px)); padding:22px; border-radius:24px; border:0; background:var(--paper); color:var(--ink); box-shadow:0 30px 70px #000c; }
+  dialog.ci::backdrop { background:#000a; backdrop-filter:blur(4px); }
+  .ci .eyebrow { color:var(--coral); }
+  .ci h3 { font-size:26px; letter-spacing:-.6px; line-height:1.15; margin:4px 0 14px; }
+  .ci textarea { width:100%; resize:vertical; padding:12px; border-radius:14px; border:1px solid #0000001f; background:#fffaf0; color:var(--ink); font:inherit; font-size:16px; }
+  .ci-photo { display:flex; align-items:center; gap:12px; margin-top:12px; }
+  .ci-photo .chip { cursor:pointer; background:#fffaf0; border-color:#0000001f; color:var(--ink); }
+  .ci-photo img { width:56px; height:56px; border-radius:12px; object-fit:cover; }
+  .ci-actions { display:flex; gap:10px; margin-top:18px; }
+  .ci-actions .chip { background:none; border-color:#00000026; color:var(--ink); padding:0 18px; }
+  .ci-actions .cta { flex:1; height:50px; font-size:15px; }
+  .ci-actions .cta:disabled { opacity:.6; }
+
   @media (max-width:1100px) { .explore { grid-template-columns:1fr 320px; } .pp-layout { grid-template-columns:1fr; } }
-  @media (max-width:860px) { .app { grid-template-columns:72px 1fr; } aside .brand b, aside .brand small, .city-pick, nav.main span:not(.ic), .xp-card, .me-row div:last-child { display:none; } .explore { grid-template-columns:1fr; } .detail { display:none; } }
+  @media (max-width:860px) { .app { grid-template-columns:72px 1fr; } aside .brand b, aside .brand small, .city-pick, nav.main span:not(.ic), .xp-card, .me-row div:last-child { display:none; } .explore { grid-template-columns:1fr; } .detail { display:none; }
+    .legend { display:none; }
+    .sheet { display:block; position:absolute; left:0; right:0; bottom:0; z-index:4; padding:10px 16px 18px; border-radius:28px 28px 0 0; background:linear-gradient(#18322bf5,#10201cfa); border-top:1px solid var(--line); backdrop-filter:blur(10px); }
+  }
+
+  /* ---------- mobile: mirrors claude-revamp.html ---------- */
+  @media (max-width:640px) {
+    .app { display:block; position:relative; height:100vh; height:100dvh; }
+    aside { display:none; }
+    .stage { height:100%; }
+    .topbar { display:none; }
+    .app[data-view="explore"] .topbar { display:flex; position:absolute; top:0; left:0; right:0; z-index:6; padding:calc(env(safe-area-inset-top) + 12px) 14px 0; background:none; border:0; pointer-events:none; }
+    .topbar > * { pointer-events:auto; }
+    .search { max-width:none; min-width:0; height:46px; border-radius:16px; background:#0c1815ee; backdrop-filter:blur(14px); }
+    .search input { font-size:16px; }
+    .search kbd, .top-right { display:none; }
+    .search .s-xp { display:inline; margin-left:auto; flex:none; color:var(--gold); font-weight:700; font-size:12px; }
+
+    /* explore */
+    .map-ui { top:calc(env(safe-area-inset-top) + 68px); left:0; right:0; }
+    .map-ui .filters { margin:0; }
+    .area-btn, .map-status { top:calc(env(safe-area-inset-top) + 150px); }
+    .map .leaflet-bottom.leaflet-right { bottom:auto; top:calc(env(safe-area-inset-top) + 112px); }
+    .zoom { display:none; }
+    .filters { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+    .filters::-webkit-scrollbar { display:none; }
+    .map-ui .filters { padding:0 14px; }
+    .sheet { padding-bottom:calc(94px + env(safe-area-inset-bottom)); }
+
+    /* shared page chrome */
+    .scroll { padding:calc(env(safe-area-inset-top) + 22px) 20px calc(110px + env(safe-area-inset-bottom)); }
+    .scroll .filters { margin:0 -20px; padding:0 20px; }
+    h1 { font-size:28px; letter-spacing:-.8px; line-height:1.15; margin-top:4px; }
+
+    /* quests */
+    .banner { flex-wrap:wrap; gap:14px; padding:16px; border-radius:22px; margin:16px 0; }
+    .banner .flame { font-size:38px; }
+    .banner strong { font-size:22px; }
+    .banner > div:nth-child(2) { flex:1; min-width:0; font-size:13px; }
+    .banner .days { margin-left:0; width:100%; justify-content:space-between; }
+    .qgrid { grid-template-columns:1fr; gap:12px; margin-top:14px; }
+    .qcard { padding:16px; }
+    .qcard:hover { transform:none; }
+    .qcard .ic { width:46px; height:46px; border-radius:15px; font-size:24px; }
+    .qcard h4 { font-size:15px; }
+    .qcard .pct { font-size:15px; }
+
+    /* passport */
+    .pp-head { flex-direction:column; align-items:stretch; gap:14px; margin-bottom:16px; }
+    .switcher button { flex:1; padding:9px 0; font-size:12px; }
+    .pp-layout { gap:14px; }
+    .book { border-radius:22px; padding:18px 16px 16px 26px; box-shadow:0 14px 30px #0006; }
+    .book::before { width:10px; }
+    .book h2 { font-size:26px; letter-spacing:-.8px; }
+    .seal { width:56px; height:56px; font-size:9px; }
+    .seal b { font-size:16px; }
+    .stamps { grid-template-columns:repeat(3,1fr); gap:10px; margin-top:16px; }
+    .stamp { min-width:0; border-radius:14px; padding:6px; font-size:10px; gap:3px; overflow-wrap:anywhere; }
+    .book.global .stamps { gap:8px; }
+    .stamp .e { font-size:24px; }
+    .stamp small { font-size:9px; }
+    .gstats { flex-wrap:wrap; gap:14px; margin-top:18px; font-size:12px; }
+    .gmap { height:140px; margin-top:18px; }
+    .stats3 { gap:10px; }
+    .stat { padding:12px; border-radius:16px; }
+    .stat strong { font-size:22px; }
+    .city { padding:12px; }
+    .city .sk { width:48px; height:48px; font-size:24px; }
+    .city .ct { font-size:20px; }
+
+    /* badges */
+    .b-head { flex-direction:column; text-align:center; gap:14px; margin-bottom:16px; }
+    .ring { width:120px; height:120px; }
+    .ring div { width:100px; height:100px; }
+    .ring strong { font-size:30px; }
+    .bgrid { grid-template-columns:repeat(3,1fr); gap:16px 12px; margin-top:16px; }
+    .badge { padding:0; background:none; border:0; border-radius:0; font-size:11px; }
+    .badge:hover { transform:none; }
+    .badge .hex { width:78px; height:78px; font-size:32px; margin-bottom:6px; }
+    .badge b { font-size:11px; }
+    .badge small { font-size:10px; }
+
+    /* bottom tab bar */
+    .tabbar { display:flex; position:fixed; left:14px; right:14px; bottom:calc(14px + env(safe-area-inset-bottom)); height:64px; border-radius:22px; background:#0c1815ee; backdrop-filter:blur(14px); border:1px solid var(--line); justify-content:space-around; align-items:center; z-index:40; }
+    .tabbar button { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:10px; color:var(--muted); padding:6px 12px; border-radius:14px; }
+    .tabbar button span { font-size:19px; line-height:1; }
+    .tabbar button.on { color:var(--gold); background:#f2b84b1a; }
+
+    /* toast drops from the top so it never covers the sheet or tab bar */
+    .toast { top:calc(env(safe-area-inset-top) + 14px); bottom:auto; transform:translate(-50%,-40px); width:max-content; max-width:calc(100% - 32px); text-align:center; }
+  }
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app" data-view="explore">
 
   <aside>
     <div class="brand"><div class="mark">🧭</div><div><b>City Quest</b><small>Explore. Collect. Repeat.</small></div></div>
-    <button class="city-pick"><span style="font-size:20px">🌲</span><div><small>Exploring</small>Portland, OR</div><span>⌄</span></button>
+    <button class="city-pick" id="cityPick" title="Recenter on your location"><span style="font-size:20px">📍</span><div><small>Exploring</small><span id="cityName">Finding you…</span></div><span>⌖</span></button>
     <nav class="main" id="nav">
       <button class="on" data-view="explore"><span class="ic">🧭</span><span>Explore</span></button>
-      <button data-view="quests"><span class="ic">🎯</span><span>Quests</span><span class="count">3</span></button>
+      <button data-view="quests"><span class="ic">🎯</span><span>Quests</span><span class="count" id="questCount">0</span></button>
       <button data-view="passport"><span class="ic">📘</span><span>Passport</span></button>
-      <button data-view="badges"><span class="ic">🏅</span><span>Badges</span><span class="count">19</span></button>
+      <button data-view="badges"><span class="ic">🏅</span><span>Badges</span><span class="count" id="badgeCount">0</span></button>
     </nav>
     <div class="xp-card">
-      <div class="lv"><b>Level 7</b><span style="color:var(--gold)" id="xp">1,240 XP</span></div>
-      <div class="bar"><i style="width:82%"></i></div>
-      <small>260 XP to Level 8 · Wayfinder</small>
+      <div class="lv"><b id="lvl">Level 1</b><span style="color:var(--gold)" id="xp">0 XP</span></div>
+      <div class="bar"><i id="xpBar" style="width:0"></i></div>
+      <small id="xpNext"></small>
     </div>
     <div class="me-row"><div class="avatar">JR</div><div><b>Julian</b><small>julianreyes.dev</small></div></div>
   </aside>
 
   <section class="stage">
     <div class="topbar">
-      <div class="search">🔍 Search venues, quests, cities… <kbd>⌘K</kbd></div>
-      <div class="top-right"><span class="pill fire">🔥 6-day streak</span><span class="pill">⚡ <span id="xp2">1,240</span> XP</span><button class="pill">🌙 Dark</button></div>
+      <label class="search">🔍 <input id="search" type="search" placeholder="Search venues on the map…" autocomplete="off" aria-label="Search venues on the map"> <kbd>⌘K</kbd><span class="s-xp">⚡ <span id="xp3">0</span> XP</span></label>
+      <div class="top-right"><span class="pill fire" id="streakPill">🔥</span><span class="pill">⚡ <span id="xp2">0</span> XP</span></div>
     </div>
 
     <div class="views">
@@ -234,21 +416,14 @@
       <div class="view on" id="explore">
         <div class="explore">
           <div class="map">
-            <svg viewBox="0 0 1000 800" preserveAspectRatio="none" aria-hidden="true">
-              <g fill="none" stroke="#2a4b40" stroke-width="14" stroke-linecap="round">
-                <path d="M-10 200 C250 170 500 300 1010 230"/><path d="M200 -10 C260 260 150 520 280 810"/><path d="M-10 540 C300 480 600 600 1010 500"/><path d="M700 -10 C640 250 800 480 720 810"/><path d="M480 -10 C520 300 430 500 520 810" stroke-width="8"/>
-              </g>
-              <path d="M-10 700 C250 620 500 740 1010 650 L1010 810 L-10 810Z" fill="#1c3c4a" opacity=".7"/>
-              <rect x="560" y="330" width="130" height="90" rx="18" fill="#1f4a35" opacity=".8"/>
-            </svg>
-            <div id="pins"></div>
-            <div class="me"></div>
+            <div id="map"></div>
             <div class="map-ui">
-              <div class="filters" id="filters">
-                <button class="chip on">All</button><button class="chip">☕ Coffee</button><button class="chip">🍜 Food</button><button class="chip">🎨 Culture</button><button class="chip">🌳 Parks</button><button class="chip">🍺 Bars</button>
-              </div>
-              <div class="zoom"><button>＋</button><button>－</button></div>
+              <div class="filters" id="cats"></div>
+              <div class="zoom"><button id="zoomIn" aria-label="Zoom in">＋</button><button id="zoomOut" aria-label="Zoom out">－</button><button id="recenter" aria-label="Recenter on your location" disabled>⌖</button></div>
             </div>
+            <button class="area-btn" id="areaBtn" hidden>↻ Search this area</button>
+            <div class="map-status" id="mapStatus" role="status" hidden></div>
+            <div class="sheet" id="sheet"></div>
             <div class="legend"><span><i style="background:var(--mint)"></i>Visited</span><span><i style="background:var(--coral)"></i>New</span><span><i style="background:var(--gold)"></i>Selected</span><span><i style="background:var(--sky)"></i>You</span></div>
           </div>
           <div class="detail" id="detail"></div>
@@ -257,185 +432,51 @@
 
       <!-- QUESTS -->
       <div class="view" id="quests"><div class="scroll"><div class="inner">
-        <div class="eyebrow">Portland · Season 2</div><h1>Quests</h1><p class="sub">Complete themed sets of venues to earn badges and XP.</p>
-        <div class="banner"><div class="flame">🔥</div><div><strong>6-day streak</strong>Check in anywhere today to keep it alive</div>
-          <div class="days"><span class="on">M</span><span class="on">T</span><span class="on">W</span><span class="on">T</span><span class="on">F</span><span class="on">S</span><span>S</span></div></div>
-        <div class="filters" data-group><button class="chip on">Active</button><button class="chip">☕ Coffee</button><button class="chip">🍔 Foodie</button><button class="chip">🌲 Outdoors</button><button class="chip">Completed</button></div>
-        <div class="qgrid">
-          <div class="qcard"><header><div class="ic">☕</div><div><h4>Coffee Crawl</h4><small>Visit 5 different cafés</small></div><div class="pct">80%</div></header><div class="bar"><i style="width:80%"></i></div><div class="steps"><span class="done">✓ Heart</span><span class="done">✓ Coava</span><span class="done">✓ Stumptown</span><span class="done">✓ Case Study</span><span>○ ?</span></div><span class="reward">Reward · “Bean Counter” badge + 200 XP</span></div>
-          <div class="qcard"><header><div class="ic">🥐</div><div><h4>Baker's Dozen</h4><small>Visit 5 bakeries</small></div><div class="pct">60%</div></header><div class="bar"><i style="width:60%"></i></div><div class="steps"><span class="done">✓ Pain Doré</span><span class="done">✓ Little T</span><span class="done">✓ Dame</span><span>○</span><span>○</span></div><span class="reward">Reward · “Baker's Dozen” badge + 180 XP</span></div>
-          <div class="qcard"><header><div class="ic">🎨</div><div><h4>Gallery Hopper</h4><small>3 museums or galleries</small></div><div class="pct">33%</div></header><div class="bar"><i style="width:33%"></i></div><div class="steps"><span class="done">✓ PAM</span><span>○ ?</span><span>○ ?</span></div><span class="reward">Reward · “Patron” badge + 150 XP</span></div>
-          <div class="qcard"><header><div class="ic">🌳</div><div><h4>Touch Grass</h4><small>5 parks or trails</small></div><div class="pct">20%</div></header><div class="bar"><i style="width:20%"></i></div><div class="steps"><span class="done">✓ Forest Park</span><span>○</span><span>○</span><span>○</span><span>○</span></div><span class="reward">Reward · “Ranger” badge + 250 XP</span></div>
-          <div class="qcard"><header><div class="ic">🍺</div><div><h4>Hop Head</h4><small>5 breweries</small></div><div class="pct">0%</div></header><div class="bar"><i style="width:0"></i></div><div class="steps"><span>○</span><span>○</span><span>○</span><span>○</span><span>○</span></div><span class="reward">Reward · “Hop Head” badge + 220 XP</span></div>
-          <div class="qcard"><header><div class="ic">📚</div><div><h4>Bookworm</h4><small>3 bookstores or libraries</small></div><div class="pct">33%</div></header><div class="bar"><i style="width:33%"></i></div><div class="steps"><span class="done">✓ Powell's</span><span>○</span><span>○</span></div><span class="reward">Reward · “Bookworm” badge + 120 XP</span></div>
-        </div>
+        <div class="eyebrow" id="questEyebrow">Your quests</div><h1>Quests</h1><p class="sub">Complete themed sets of venues to earn badges and XP. Tap a step to find one nearby.</p>
+        <div class="banner" id="streak"></div>
+        <div class="filters" id="questFilters"><button class="chip on" data-f="active">Active</button><button class="chip" data-f="all">All</button><button class="chip" data-f="done">Completed</button></div>
+        <div class="qgrid" id="qgrid"></div>
       </div></div></div>
 
       <!-- PASSPORT -->
       <div class="view" id="passport"><div class="scroll"><div class="inner">
         <div class="pp-head">
-          <div><div class="eyebrow">Passport</div><h1 id="ppTitle">Portland, OR</h1><p class="sub" id="ppSub">23 venues stamped · 14% of the city explored</p></div>
-          <div class="switcher" id="switcher"><button class="on" data-p="city">Portland</button><button data-p="global">All cities</button></div>
+          <div><div class="eyebrow">Passport</div><h1 id="ppTitle">Your world</h1><p class="sub" id="ppSub"></p></div>
+          <div class="switcher" id="switcher"></div>
         </div>
-
-        <div class="panel on" id="p-city">
-          <div class="pp-layout">
-            <div class="book">
-              <div class="hd"><div><div class="eyebrow">Official visitor record</div><h2>Portland Edition</h2></div><div class="seal"><div><b>23</b>STAMPS</div></div></div>
-              <div class="stamps">
-                <div class="stamp s1"><span class="e">☕</span>Heart Coffee<small>Sep 28</small></div>
-                <div class="stamp s2"><span class="e">🥐</span>Pain Doré<small>Sep 30</small></div>
-                <div class="stamp s3"><span class="e">🌳</span>Forest Park<small>Sep 14</small></div>
-                <div class="stamp s4"><span class="e">🎨</span>PAM<small>Sep 9</small></div>
-                <div class="stamp s5"><span class="e">📚</span>Powell's<small>Aug 30</small></div>
-                <div class="stamp s1"><span class="e">🍜</span>Pok Pok<small>Aug 22</small></div>
-                <div class="stamp s3"><span class="e">🍺</span>Breakside<small>Aug 18</small></div>
-                <div class="stamp s2"><span class="e">🌹</span>Rose Garden<small>Aug 11</small></div>
-                <div class="stamp locked"><span class="e">🍕</span>? ? ?</div>
-                <div class="stamp locked"><span class="e">🎭</span>? ? ?</div>
-                <div class="stamp locked"><span class="e">🛶</span>? ? ?</div>
-                <div class="stamp locked"><span class="e">🎵</span>? ? ?</div>
-              </div>
-            </div>
-            <div class="side-col">
-              <div class="stats3"><div class="stat"><strong>23</strong><small>Venues</small></div><div class="stat"><strong>8</strong><small>Categories</small></div><div class="stat"><strong>14%</strong><small>Explored</small></div></div>
-              <div class="sec-h">By category</div>
-              <div class="city"><div class="sk" style="background:#e9a25a33">☕</div><div style="flex:1"><h5>Coffee</h5><small>8 of 14 nearby</small><div class="bar"><i style="width:57%"></i></div></div><div class="ct">8</div></div>
-              <div class="city"><div class="sk" style="background:#ee6c4d33">🍜</div><div style="flex:1"><h5>Food &amp; drink</h5><small>6 of 30 nearby</small><div class="bar"><i style="width:20%"></i></div></div><div class="ct">6</div></div>
-              <div class="city"><div class="sk" style="background:#7fd6b033">🌳</div><div style="flex:1"><h5>Outdoors</h5><small>4 of 9 nearby</small><div class="bar"><i style="width:44%"></i></div></div><div class="ct">4</div></div>
-              <div class="city"><div class="sk" style="background:#b58ae033">🎨</div><div style="flex:1"><h5>Culture</h5><small>3 of 12 nearby</small><div class="bar"><i style="width:25%"></i></div></div><div class="ct">3</div></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel" id="p-global">
-          <div class="pp-layout">
-            <div class="book global">
-              <div class="hd"><div><div class="eyebrow">Explorer · Level 7</div><h2>Global Passport</h2></div><div class="seal"><div><b>4</b>CITIES</div></div></div>
-              <div style="margin-top:24px;display:flex;justify-content:space-between;font-size:13px"><span>1,240 / 1,500 XP</span><span style="color:var(--gold)">Level 8 →</span></div>
-              <div class="bar" style="margin-top:7px"><i style="width:82%"></i></div>
-              <div class="gstats"><span>📍 61 venues</span><span>🏅 19 badges</span><span>🔥 6 days</span></div>
-              <div class="gmap">
-                <div class="gdot" style="left:12%;top:30%"><span>Portland</span></div>
-                <div class="gdot" style="left:10%;top:52%"><span>San Francisco</span></div>
-                <div class="gdot" style="left:74%;top:34%"><span>New York</span></div>
-                <div class="gdot" style="left:30%;top:78%"><span>Honolulu</span></div>
-              </div>
-              <div class="stamps" style="grid-template-columns:repeat(4,1fr)">
-                <div class="stamp s1" style="color:#f2b84b;border-color:#f2b84b"><span class="e">🌲</span>Portland<small>23</small></div>
-                <div class="stamp s2" style="color:#7cc3e8;border-color:#7cc3e8"><span class="e">🌉</span>San Francisco<small>19</small></div>
-                <div class="stamp s3" style="color:#b58ae0;border-color:#b58ae0"><span class="e">🗽</span>New York<small>14</small></div>
-                <div class="stamp s5" style="color:#7fd6b0;border-color:#7fd6b0"><span class="e">🌴</span>Honolulu<small>5</small></div>
-              </div>
-            </div>
-            <div class="side-col">
-              <div class="stats3"><div class="stat"><strong>61</strong><small>Venues</small></div><div class="stat"><strong>4</strong><small>Cities</small></div><div class="stat"><strong>19</strong><small>Badges</small></div></div>
-              <div class="sec-h">Your cities</div>
-              <div class="city"><div class="sk" style="background:#7fd6b033">🌲</div><div style="flex:1"><h5>Portland, OR</h5><small>Last visit today</small><div class="bar"><i style="width:14%"></i></div></div><div class="ct">23<small>stamps</small></div></div>
-              <div class="city"><div class="sk" style="background:#7cc3e833">🌉</div><div style="flex:1"><h5>San Francisco, CA</h5><small>Last visit Aug 12</small><div class="bar"><i style="width:22%"></i></div></div><div class="ct">19<small>stamps</small></div></div>
-              <div class="city"><div class="sk" style="background:#b58ae033">🗽</div><div style="flex:1"><h5>New York, NY</h5><small>Last visit Jun 3</small><div class="bar"><i style="width:9%"></i></div></div><div class="ct">14<small>stamps</small></div></div>
-              <div class="city"><div class="sk" style="background:#f2b84b33">🌴</div><div style="flex:1"><h5>Honolulu, HI</h5><small>Last visit Jan 20</small><div class="bar"><i style="width:6%"></i></div></div><div class="ct">5<small>stamps</small></div></div>
-            </div>
-          </div>
-        </div>
+        <div id="ppBody"></div>
       </div></div></div>
 
       <!-- BADGES -->
       <div class="view" id="badges"><div class="scroll"><div class="inner">
-        <div class="b-head"><div class="ring"><div><span><strong>62%</strong><small>complete</small></span></div></div><div><div class="eyebrow">Achievements</div><h1>19 of 31 unlocked</h1><p class="sub">Next up: Baker's Dozen is 2 check-ins away.</p></div></div>
-        <div class="filters" data-group><button class="chip on">All</button><button class="chip">Earned</button><button class="chip">In progress</button><button class="chip">Locked</button></div>
-        <div class="bgrid">
-          <div class="badge gold"><div class="hex">☕</div><b>Bean Counter</b><small>5 cafés</small></div>
-          <div class="badge silver"><div class="hex">🥐</div><b>Baker's Dozen</b><small>3 / 5 bakeries</small></div>
-          <div class="badge bronze"><div class="hex">🌳</div><b>Ranger</b><small>1 / 5 parks</small></div>
-          <div class="badge gold"><div class="hex">🗺️</div><b>Cartographer</b><small>3 cities</small></div>
-          <div class="badge silver"><div class="hex">🎨</div><b>Patron</b><small>1 / 3 galleries</small></div>
-          <div class="badge gold"><div class="hex">🔥</div><b>Week Warrior</b><small>7-day streak</small></div>
-          <div class="badge gold"><div class="hex">📚</div><b>First Chapter</b><small>1 bookstore</small></div>
-          <div class="badge bronze"><div class="hex">🍜</div><b>Noodle Nomad</b><small>2 / 5 ramen</small></div>
-          <div class="badge lock"><div class="hex">🌙</div><b>Night Owl</b><small>Check in after 10pm</small></div>
-          <div class="badge lock"><div class="hex">🍺</div><b>Hop Head</b><small>5 breweries</small></div>
-          <div class="badge lock"><div class="hex">✈️</div><b>Globetrotter</b><small>10 cities</small></div>
-          <div class="badge lock"><div class="hex">👑</div><b>Local Legend</b><small>100 venues</small></div>
-        </div>
+        <div class="b-head"><div class="ring" id="ring"><div><span><strong id="ringPct">0%</strong><small>complete</small></span></div></div><div><div class="eyebrow">Achievements</div><h1 id="badgeTitle"></h1><p class="sub" id="badgeSub"></p></div></div>
+        <div class="filters" id="badgeFilters"><button class="chip on" data-f="all">All</button><button class="chip" data-f="earned">Earned</button><button class="chip" data-f="progress">In progress</button><button class="chip" data-f="locked">Locked</button></div>
+        <div class="bgrid" id="bgrid"></div>
       </div></div></div>
 
     </div>
-    <div class="toast" id="toast"></div>
+    <div class="toast" id="toast" role="status"></div>
   </section>
+
+  <nav class="tabbar" id="tabbar" aria-label="Main">
+    <button class="on" data-view="explore"><span>🧭</span>Explore</button><button data-view="quests"><span>🎯</span>Quests</button><button data-view="passport"><span>📘</span>Passport</button><button data-view="badges"><span>🏅</span>Badges</button>
+  </nav>
 </div>
 
-<script>
-  const venues = [
-    { id:0, e:'🥐', name:'Le Pain Doré', type:'Bakery · Pearl District', d:'42 m', rating:'★★★★★ 4.7', price:'$$', hours:'Open till 6pm', xp:60, q:"Baker's Dozen 3/5", x:44, y:42, st:'new', bg:'#e9a25a,#b8452d' },
-    { id:1, e:'☕', name:'Heart Coffee', type:'Café · Burnside', d:'210 m', rating:'★★★★☆ 4.5', price:'$$', hours:'Open till 5pm', xp:40, q:'Visited Sep 28', x:16, y:30, st:'visited', bg:'#a97c55,#4a2f1d' },
-    { id:2, e:'🍜', name:'Pok Pok Noodle', type:'Thai · Division', d:'650 m', rating:'★★★★☆ 4.4', price:'$$', hours:'Open till 10pm', xp:70, q:'Noodle Nomad 2/5', x:66, y:26, st:'new', bg:'#ee6c4d,#8a2a18' },
-    { id:3, e:'🌳', name:'Forest Park', type:'Park · Northwest', d:'1.4 km', rating:'★★★★★ 4.9', price:'Free', hours:'Open 24h', xp:80, q:'Visited Sep 14', x:76, y:56, st:'visited', bg:'#4fa37a,#1f5a42' },
-    { id:4, e:'🎨', name:'Portland Art Museum', type:'Museum · Park Blocks', d:'820 m', rating:'★★★★☆ 4.6', price:'$$$', hours:'Open till 5pm', xp:90, q:'Gallery Hopper 2/3', x:28, y:56, st:'new', bg:'#b58ae0,#5a3d8a' },
-    { id:5, e:'🍺', name:'Breakside Brewery', type:'Brewery · Slabtown', d:'1.1 km', rating:'★★★★☆ 4.5', price:'$$', hours:'Open till 11pm', xp:70, q:'Hop Head 1/5', x:56, y:70, st:'new', bg:'#f2b84b,#a8741a' },
-    { id:6, e:'📚', name:"Powell's Books", type:'Bookstore · Pearl', d:'380 m', rating:'★★★★★ 4.8', price:'$$', hours:'Open till 9pm', xp:50, q:'Visited Aug 30', x:34, y:20, st:'visited', bg:'#7cc3e8,#2b6a95' },
-  ];
-  let sel = 0;
-  const done = new Set([1,3,6]);
-  let xp = 1240;
+<dialog class="ci" id="ci" aria-labelledby="ciName">
+  <form id="ciForm">
+    <div class="eyebrow">Check in</div>
+    <h3 id="ciName"></h3>
+    <textarea id="ciNote" rows="3" placeholder="Add a note (optional)" aria-label="Note"></textarea>
+    <div class="ci-photo">
+      <label class="chip">📷 <span id="ciPhotoLabel">Add photo</span><input type="file" id="ciPhoto" accept="image/*" hidden></label>
+      <img id="ciPreview" alt="Selected photo" hidden>
+    </div>
+    <div class="ci-actions"><button type="button" class="chip" id="ciCancel">Cancel</button><button type="submit" class="cta" id="ciSave">📘 Stamp passport</button></div>
+  </form>
+</dialog>
 
-  const pins = document.getElementById('pins'), detail = document.getElementById('detail');
-  function renderPins() {
-    pins.innerHTML = venues.map(v => {
-      const cls = v.id===sel ? 'sel' : (done.has(v.id) ? 'visited' : 'new');
-      return `<button class="pin ${cls}" style="left:${v.x}%;top:${v.y}%" data-id="${v.id}" aria-label="${v.name}"><b>${v.e}</b></button>`;
-    }).join('');
-  }
-  function renderDetail() {
-    const v = venues[sel], visited = done.has(v.id);
-    detail.innerHTML = `
-      <div class="hero-ph" style="background:linear-gradient(135deg,${v.bg})">${v.e}<span class="tag">${visited?'✓ VISITED':'NEW · '+v.d+' away'}</span></div>
-      <div class="d-body">
-        <div class="eyebrow">${visited?'In your passport':'Unvisited'}</div>
-        <h2>${v.name}</h2><div class="meta">${v.type}</div><div class="rate">${v.rating}</div>
-        <div class="facts"><div class="fact"><small>Hours</small><strong>${v.hours}</strong></div><div class="fact"><small>Price</small><strong>${v.price}</strong></div></div>
-        <button class="cta ${visited?'done':''}" id="cta">${visited?'✓ Checked in':`Check in <small>+${v.xp} XP · ${v.q}</small>`}</button>
-        <div class="nearby"><h4>Also nearby</h4>
-          ${venues.filter(o=>o.id!==sel).slice(0,4).map(o=>`<button class="near" data-id="${o.id}"><span class="e">${o.e}</span><div><b>${o.name}</b><small>${o.type}</small></div><span class="d">${o.d}</span></button>`).join('')}
-        </div>
-      </div>`;
-  }
-  function select(id){ sel=id; renderPins(); renderDetail(); }
-  pins.addEventListener('click', e => { const b=e.target.closest('.pin'); if(b) select(+b.dataset.id); });
-  detail.addEventListener('click', e => {
-    const n=e.target.closest('.near'); if(n) return select(+n.dataset.id);
-    if(e.target.closest('#cta') && !done.has(sel)) {
-      const v=venues[sel]; done.add(sel); xp+=v.xp;
-      document.getElementById('xp').textContent=xp.toLocaleString()+' XP';
-      document.getElementById('xp2').textContent=xp.toLocaleString();
-      toast(`📘 Stamped ${v.name} · +${v.xp} XP`); renderPins(); renderDetail();
-    }
-  });
-  function toast(t){ const el=document.getElementById('toast'); el.textContent=t; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2400); }
-
-  // nav
-  document.getElementById('nav').addEventListener('click', e => {
-    const b=e.target.closest('button'); if(!b) return;
-    document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('on',x===b));
-    document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id===b.dataset.view));
-  });
-  // passport switcher
-  document.getElementById('switcher').addEventListener('click', e => {
-    const b=e.target.closest('button'); if(!b) return;
-    document.querySelectorAll('#switcher button').forEach(x=>x.classList.toggle('on',x===b));
-    const g=b.dataset.p==='global';
-    document.getElementById('p-city').classList.toggle('on',!g);
-    document.getElementById('p-global').classList.toggle('on',g);
-    document.getElementById('ppTitle').textContent=g?"Julian's world":'Portland, OR';
-    document.getElementById('ppSub').textContent=g?'61 venues across 4 cities':'23 venues stamped · 14% of the city explored';
-  });
-  // chip groups
-  document.querySelectorAll('.filters').forEach(g => g.addEventListener('click', e => {
-    const c=e.target.closest('.chip'); if(!c) return;
-    g.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c));
-  }));
-
-  select(0);
-</script>
+<!-- Live data: needs Vite (npm run dev) or the built site; ES module imports don't work from file://. -->
+<script type="module" src="/src/revamp2/app.js"></script>
 </body>
 </html>
