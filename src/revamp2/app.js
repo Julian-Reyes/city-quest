@@ -129,6 +129,7 @@ const state = {
   citiesLoading: false,
   photo: null,
 };
+let sheetDrag = null; // active bottom-sheet drag, see "Sheet drag"
 const byCategory = {}; // category -> { key, venues } so switching back doesn't refetch
 const detailsLoading = new Set(); // "google:<id>" / "fsq:<id>"
 let stats = getVisitStats();
@@ -221,6 +222,10 @@ const tiles = L.tileLayer(tileUrl(document.documentElement.dataset.theme === "li
   attribution:
     '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
 }).addTo(map);
+// Plain "Leaflet" credit, without the default flag icon.
+map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
+// Keep the bottom-right attribution above the venue sheet (narrow layouts only; 0 when hidden).
+new ResizeObserver(() => $("map").parentElement.style.setProperty("--sheet-h", `${$("sheet").offsetHeight}px`)).observe($("sheet"));
 
 // ── Theme ──
 
@@ -245,13 +250,10 @@ let meMarker = null;
 // The map lives in a view that is display:none while another tab is open.
 new ResizeObserver(() => map.invalidateSize()).observe($("map"));
 
-// Dense categories return hundreds of venues, so pins shrink to dots when zoomed out.
+// Dense categories return hundreds of venues, so pins shrink (but keep their emoji) when zoomed out.
 function pinIcon(v, sel, zoom) {
   const cls = sel ? "sel" : v.visited ? "visited" : "new";
-  if (!sel && zoom < 15) {
-    return L.divIcon({ className: "cq-icon", html: `<div class="pin dot ${cls}"></div>`, iconSize: [14, 14], iconAnchor: [7, 7] });
-  }
-  const size = sel ? 46 : zoom >= 16 ? 36 : 28;
+  const size = sel ? 46 : zoom >= 16 ? 36 : zoom >= 15 ? 28 : zoom >= 13 ? 20 : 15;
   return L.divIcon({
     className: "cq-icon",
     html: `<div class="pin ${cls}" style="width:${size}px;height:${size}px"><b style="font-size:${Math.round(size * 0.45)}px">${CATEGORY_MAP[v.type]?.emoji || "📍"}</b></div>`,
@@ -520,7 +522,7 @@ function renderVenuePanels() {
         <div class="bar" style="margin-top:12px"><i style="width:${pct}%"></i></div>
         <div class="nearby"><h4>Closest first</h4>${listStateHtml(list)}</div>
       </div>`;
-    $("sheet").classList.toggle("open", state.sheetOpen);
+    $("sheet").classList.toggle("open", state.sheetOpen || !!sheetDrag);
     $("sheet").innerHTML = `
       <button class="grab" data-act="toggle" aria-label="${state.sheetOpen ? "Hide" : "Show"} the list" aria-expanded="${state.sheetOpen}"></button>
       <button class="s-sum" data-act="toggle">
@@ -557,7 +559,7 @@ function renderVenuePanels() {
       ${others.length ? `<div class="nearby"><h4>Also nearby</h4>${nearbyRows(others)}</div>` : ""}
     </div>`;
 
-  $("sheet").classList.toggle("open", state.sheetOpen);
+  $("sheet").classList.toggle("open", state.sheetOpen || !!sheetDrag);
   $("sheet").innerHTML = `
     <button class="grab" data-act="toggle" aria-label="${state.sheetOpen ? "Hide" : "Show"} venue details" aria-expanded="${state.sheetOpen}"></button>
     <div class="s-venue">
@@ -1009,6 +1011,79 @@ function onVenuePanelClick(e) {
 }
 $("detail").addEventListener("click", onVenuePanelClick);
 $("sheet").addEventListener("click", onVenuePanelClick);
+
+// ── Sheet drag ──
+// Drag the handle (or the summary under it) to open/close the list, like a native bottom sheet.
+// While dragging, the sheet is laid out open and slid down by `travel` px when closed.
+let suppressSheetClick = false;
+const sheetEl = $("sheet");
+const setSheetY = (y, animate) => {
+  sheetEl.style.transition = animate ? "transform .25s cubic-bezier(.2,.8,.2,1)" : "none";
+  sheetEl.style.transform = y ? `translateY(${y}px)` : "";
+};
+sheetEl.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0 || !e.target.closest(".grab, .s-sum, .s-venue")) return;
+  const wasOpen = state.sheetOpen;
+  const closedH = (sheetEl.classList.remove("open"), sheetEl.offsetHeight);
+  const openH = (sheetEl.classList.add("open"), sheetEl.offsetHeight);
+  const travel = openH - closedH;
+  if (travel <= 0) return sheetEl.classList.toggle("open", wasOpen);
+  sheetDrag = { id: e.pointerId, startY: e.clientY, wasOpen, travel, y: wasOpen ? 0 : travel, moved: false };
+  setSheetY(sheetDrag.y, false);
+});
+sheetEl.addEventListener("pointermove", (e) => {
+  const d = sheetDrag;
+  if (!d || e.pointerId !== d.id) return;
+  const dy = e.clientY - d.startY;
+  if (!d.moved && Math.abs(dy) < 6) return;
+  if (!d.moved) {
+    d.moved = true;
+    sheetEl.setPointerCapture(d.id);
+  }
+  d.y = Math.min(Math.max((d.wasOpen ? 0 : d.travel) + dy, 0), d.travel);
+  setSheetY(d.y, false);
+});
+function endSheetDrag(e) {
+  const d = sheetDrag;
+  if (!d || e.pointerId !== d.id) return;
+  sheetDrag = null;
+  if (!d.moved) {
+    // A plain tap: put things back and let the click handler toggle.
+    setSheetY(0, false);
+    sheetEl.classList.toggle("open", state.sheetOpen);
+    return;
+  }
+  suppressSheetClick = true;
+  setTimeout(() => (suppressSheetClick = false));
+  // Snap past a third of the way in the direction of travel.
+  const open = d.wasOpen ? d.y < d.travel / 3 : d.y < (d.travel * 2) / 3;
+  if (open) {
+    state.sheetOpen = true;
+    renderVenuePanels();
+    setSheetY(0, true);
+  } else {
+    setSheetY(d.travel, true);
+    // transitionend never fires if the sheet was already dragged fully down, hence the timer.
+    setTimeout(() => {
+      if (sheetDrag) return;
+      state.sheetOpen = false;
+      setSheetY(0, false);
+      renderVenuePanels();
+    }, 260);
+  }
+}
+sheetEl.addEventListener("pointerup", endSheetDrag);
+sheetEl.addEventListener("pointercancel", endSheetDrag);
+// The click that follows a drag shouldn't also toggle the sheet.
+sheetEl.addEventListener(
+  "click",
+  (e) => {
+    if (!suppressSheetClick) return;
+    suppressSheetClick = false;
+    e.stopImmediatePropagation();
+  },
+  true,
+);
 $("mapStatus").addEventListener("click", onVenuePanelClick);
 $("areaBtn").addEventListener("click", () => state.pendingArea && setCenter(state.pendingArea, { move: false }));
 $("zoomIn").addEventListener("click", () => map.zoomIn());
