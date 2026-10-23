@@ -13,7 +13,7 @@ export default defineConfig({
         main: fileURLToPath(new URL("./index.html", import.meta.url)),
         preview: fileURLToPath(new URL("./ui-preview.html", import.meta.url)),
         revamp: fileURLToPath(new URL("./claude-revamp.html", import.meta.url)),
-        revamp2: fileURLToPath(new URL("./claude-revamp-2.html", import.meta.url)),
+        old: fileURLToPath(new URL("./indexOld.html", import.meta.url)),
       },
     },
   },
@@ -25,8 +25,8 @@ export default defineConfig({
         name: "City Quest",
         short_name: "CityQuest",
         description: "Gamify exploring your city — discover venues, check in, unlock achievements.",
-        theme_color: "#0f0f1a",
-        background_color: "#0f0f1a",
+        theme_color: "#10201c",
+        background_color: "#0b1512",
         display: "standalone",
         start_url: "/city-quest/",
         icons: [
@@ -37,8 +37,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff,woff2}"],
-        // Standalone mockup pages must not be swallowed by the SPA fallback
-        navigateFallbackDenylist: [/claude-revamp/, /ui-preview/],
+        // Standalone pages (mockups and the old React app) must not be swallowed by the SPA fallback
+        navigateFallbackDenylist: [/claude-revamp/, /ui-preview/, /indexOld/],
       },
     }),
   ],

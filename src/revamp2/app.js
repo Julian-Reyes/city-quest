@@ -1,9 +1,8 @@
 /**
- * revamp2/app.js — Live data for claude-revamp-2.html (the desktop + mobile revamp mockup)
+ * revamp2/app.js — The main app (index.html): desktop + mobile revamp UI
  *
  * Plain DOM rendering (no React) on top of the same API and storage modules the
- * real app uses, so check-ins made here show up in index.html and vice versa.
- * Nothing in this file is imported by index.html or ui-preview.html.
+ * old React app uses, so check-ins made here show up in indexOld.html and vice versa.
  *
  * XP, levels and streaks don't exist in the real app yet; they are derived here
  * from visit history (see progress() and streakInfo()) and never stored.
@@ -216,11 +215,31 @@ function streakInfo() {
 // ── Map ──
 
 const map = L.map("map", { zoomControl: false }).setView([FALLBACK.lat, FALLBACK.lng], 14);
-L.tileLayer("https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png", {
+const tileUrl = (light) => `https://tiles.stadiamaps.com/tiles/alidade_smooth${light ? "" : "_dark"}/{z}/{x}/{y}{r}.png`;
+const tiles = L.tileLayer(tileUrl(document.documentElement.dataset.theme === "light"), {
   maxZoom: 19,
   attribution:
     '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
 }).addTo(map);
+
+// ── Theme ──
+
+function applyTheme(light) {
+  const root = document.documentElement;
+  if (light) root.dataset.theme = "light";
+  else delete root.dataset.theme;
+  tiles.setUrl(tileUrl(light));
+  const btn = $("themeBtn");
+  btn.textContent = light ? "🌙" : "☀️";
+  btn.title = btn.ariaLabel = light ? "Switch to dark mode" : "Switch to light mode";
+  document.querySelector('meta[name="theme-color"]').content = light ? "#fbf7ee" : "#10201c";
+}
+applyTheme(document.documentElement.dataset.theme === "light");
+$("themeBtn").addEventListener("click", () => {
+  const light = document.documentElement.dataset.theme !== "light";
+  try { localStorage.setItem("cq-theme", light ? "light" : "dark"); } catch { /* storage blocked: theme just won't persist */ }
+  applyTheme(light);
+});
 const pinLayer = L.layerGroup().addTo(map);
 let meMarker = null;
 // The map lives in a view that is display:none while another tab is open.
@@ -282,12 +301,31 @@ map.on("moveend", () => {
 
 // ── Data loading ──
 
-let loadCtl = null;
+// Searches aren't aborted when you switch category: they finish in the background and fill
+// byCategory, so switching back is instant. inflight dedupes a search still running.
+const inflight = {}; // category -> { key, promise }
+
+async function fetchCategory(cat, c) {
+  const fetched = await fetchVenues(c.lat, c.lng, cat, undefined, c.radius ?? DEFAULT_RADIUS);
+  const visits = getVisits();
+  const hydrated = filterGhostVenues(fetched).map((v) => withVisits(v, visits));
+  if (backfillVisitTypes(hydrated)) refreshStats();
+  // Keep earlier searches and every saved check-in of this category on the map.
+  const merged = new Map();
+  for (const v of [...getVisitedVenues(cat), ...(byCategory[cat]?.venues || [])]) merged.set(v.id, v);
+  for (const v of hydrated) {
+    const old = merged.get(v.id);
+    merged.set(v.id, old ? { ...v, fsqData: old.fsqData, googleData: old.googleData } : v);
+  }
+  return filterGhostVenues([...merged.values()]);
+}
+
 async function loadVenues() {
   const c = state.center;
   if (!c) return;
   const cat = state.category;
   const key = `${c.lat},${c.lng},${c.radius ?? DEFAULT_RADIUS}`;
+  const current = () => state.category === cat && state.center === c;
   if (byCategory[cat]?.key === key) {
     state.venues = byCategory[cat].venues;
     state.loading = false;
@@ -296,32 +334,31 @@ async function loadVenues() {
     if (currentVenue()) loadDetails(currentVenue());
     return;
   }
-  loadCtl?.abort();
-  const ctl = (loadCtl = new AbortController());
   state.venues = byCategory[cat]?.venues || getVisitedVenues(cat);
   state.loading = true;
   state.error = null;
   renderExplore();
+  let job = inflight[cat];
+  if (job?.key !== key) {
+    job = inflight[cat] = { key, promise: fetchCategory(cat, c) };
+    job.promise
+      .then((venues) => {
+        if (inflight[cat] === job) byCategory[cat] = { key, venues };
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (inflight[cat] === job) delete inflight[cat];
+      });
+  }
   try {
-    const fetched = await fetchVenues(c.lat, c.lng, cat, ctl.signal, c.radius ?? DEFAULT_RADIUS);
-    if (ctl.signal.aborted) return;
-    const visits = getVisits();
-    const hydrated = filterGhostVenues(fetched).map((v) => withVisits(v, visits));
-    if (backfillVisitTypes(hydrated)) refreshStats();
-    // Keep earlier searches and every saved check-in of this category on the map.
-    const merged = new Map();
-    for (const v of [...getVisitedVenues(cat), ...(byCategory[cat]?.venues || [])]) merged.set(v.id, v);
-    for (const v of hydrated) {
-      const old = merged.get(v.id);
-      merged.set(v.id, old ? { ...v, fsqData: old.fsqData, googleData: old.googleData } : v);
-    }
-    state.venues = filterGhostVenues([...merged.values()]);
-    byCategory[cat] = { key, venues: state.venues };
+    await job.promise;
   } catch (err) {
-    if (ctl.signal.aborted) return;
+    if (!current()) return;
     console.error("Failed to fetch venues:", err);
     state.error = "Couldn't load venues.";
   }
+  if (!current()) return;
+  if (byCategory[cat]?.key === key) state.venues = byCategory[cat].venues;
   state.loading = false;
   renderExplore();
   if (currentVenue()) loadDetails(currentVenue());
@@ -856,7 +893,7 @@ function renderBadges() {
   const total = ACHIEVEMENTS.length;
   const pct = Math.round((unlocked.length / total) * 100);
   $("badgeCount").textContent = unlocked.length;
-  $("ring").style.background = `conic-gradient(var(--gold) 0 ${pct}%,#ffffff14 ${pct}% 100%)`;
+  $("ring").style.background = `conic-gradient(var(--gold) 0 ${pct}%,var(--wash) ${pct}% 100%)`;
   $("ringPct").textContent = `${pct}%`;
   $("badgeTitle").textContent = `${unlocked.length} of ${total} unlocked`;
   const next = ACHIEVEMENTS.filter((a) => (stats[a.stat] || 0) < a.threshold).sort(

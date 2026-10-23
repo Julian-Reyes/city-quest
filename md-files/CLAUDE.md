@@ -6,6 +6,8 @@ A mobile-first PWA that gamifies exploring your city. Users discover venues and 
 **Live at**: https://julianreyes.dev/city-quest/
 **Repo**: Julian-Reyes/city-quest
 
+**Entry points**: `index.html` is the revamp UI (plain DOM, `src/revamp2/app.js`, formerly `claude-revamp-2.html`). The original React app (`src/main.jsx` → `App.jsx`, described in most of this guide) is still built and reachable at `indexOld.html`. Both share the same API and storage modules, so check-ins carry over.
+
 ---
 
 ## What's Already Built

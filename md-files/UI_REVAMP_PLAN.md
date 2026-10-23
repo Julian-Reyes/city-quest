@@ -1,6 +1,6 @@
 # UI Revamp Implementation Plan
 
-Status: **not started**. Mockups are done; this doc is the brief for implementing them in the real app.
+Status: **superseded**. `claude-revamp-2.html` was wired to live data (`src/revamp2/app.js`) and became `index.html`; the old React app moved to `indexOld.html`. The plan below is kept for reference.
 
 ## Reference mockups (repo root)
 - `claude-revamp.html` — target design for **mobile / phone** (incl. installed iOS PWA)
